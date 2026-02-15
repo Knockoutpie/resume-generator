@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Generator</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Panel: Form Input -->
+        <div class="form-panel">
+            <h1>Resume Generator</h1>
+
+            <!-- Import Resume Section -->
+            <section class="form-section import-section">
+                <h2>Import Existing Resume</h2>
+                <p class="import-description">Upload a PDF or DOCX file to auto-fill the form</p>
+                <div class="import-container">
+                    <input type="file" id="resumeFile" accept=".pdf,.docx" onchange="handleFileImport(event)">
+                    <label for="resumeFile" class="import-btn">
+                        <span class="import-icon">📄</span>
+                        Choose File (PDF or DOCX)
+                    </label>
+                    <span id="fileName" class="file-name"></span>
+                </div>
+                <div id="importStatus" class="import-status"></div>
+            </section>
+
+            <!-- Personal Information -->
+            <section class="form-section">
+                <h2>Personal Information</h2>
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" placeholder="Your Full Name" spellcheck="true">
+                    <div class="spell-suggestions"></div>
+                </div>
+                <div class="form-group">
+                    <label for="address">Address</label>
+                    <input type="text" id="address" placeholder="Street Address, City, State ZIP">
+                </div>
+                <div class="form-group">
+                    <label for="phone">Phone</label>
+                    <input type="tel" id="phone" placeholder="(555) 555-5555">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="your.email@example.com">
+                </div>
+            </section>
+
+            <!-- Certificates and Ratings -->
+            <section class="form-section">
+                <h2>Certificates and Ratings</h2>
+                <div id="certificates-container">
+                    <div class="certificate-entry">
+                        <input type="text" class="certificate-input" placeholder="Commercial Certificate with Instrument..." spellcheck="true">
+                        <button class="remove-btn" onclick="removeEntry(this)">×</button>
+                    </div>
+                </div>
+                <button class="add-btn" onclick="addCertificate()">+ Add Certificate</button>
+            </section>
+
+            <!-- Hours -->
+            <section class="form-section">
+                <h2>Flight Hours</h2>
+                <div id="hours-container">
+                    <div class="hours-entry">
+                        <label class="hours-label-fixed">Total Hours</label>
+                        <input type="number" class="hours-value" data-label="Total Hours" placeholder="0">
+                    </div>
+                    <div class="hours-entry">
+                        <label class="hours-label-fixed">Multi Engine</label>
+                        <input type="number" class="hours-value" data-label="Multi Engine" placeholder="0">
+                    </div>
+                    <div class="hours-entry">
+                        <label class="hours-label-fixed">Pilot in Command</label>
+                        <input type="number" class="hours-value" data-label="Pilot in Command" placeholder="0">
+                    </div>
+                    <div class="hours-entry">
+                        <label class="hours-label-fixed">Instrument (Simulated & Actual)</label>
+                        <input type="number" class="hours-value" data-label="Instrument (Simulated & Actual)" placeholder="0">
+                    </div>
+                    <div class="hours-entry">
+                        <label class="hours-label-fixed">Cross Country</label>
+                        <input type="number" class="hours-value" data-label="Cross Country" placeholder="0">
+                    </div>
+                    <div class="hours-entry">
+                        <label class="hours-label-fixed">Night</label>
+                        <input type="number" class="hours-value" data-label="Night" placeholder="0">
+                    </div>
+                </div>
+                <button class="add-btn" onclick="addHours()">+ Add Custom Hours Entry</button>
+            </section>
+
+            <!-- Work Experience -->
+            <section class="form-section">
+                <h2>Work Experience</h2>
+                <div id="experience-container">
+                    <div class="experience-entry">
+                        <div class="form-group">
+                            <label>Company Name</label>
+                            <input type="text" class="company-name" placeholder="Company Name" spellcheck="true">
+                        </div>
+                        <div class="form-group">
+                            <label>Job Title</label>
+                            <input type="text" class="job-title" placeholder="Job Title" spellcheck="true">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="text" class="start-date" placeholder="Month Year">
+                            </div>
+                            <div class="form-group">
+                                <label>End Date</label>
+                                <input type="text" class="end-date" placeholder="Present">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Responsibilities</label>
+                            <div class="responsibilities-container">
+                                <div class="bullet-entry">
+                                    <span class="bullet-icon">•</span>
+                                    <input type="text" class="bullet-input" placeholder="Developed AI-powered automation workflows using Python" spellcheck="true">
+                                    <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+                                </div>
+                            </div>
+                            <button class="add-bullet-btn" onclick="addBullet(this)">+ Add Bullet Point</button>
+                        </div>
+                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Job</button>
+                    </div>
+                </div>
+                <button class="add-btn" onclick="addExperience()">+ Add Work Experience</button>
+            </section>
+
+            <!-- Education -->
+            <section class="form-section">
+                <h2>Education</h2>
+                <div id="education-container">
+                    <div class="education-entry">
+                        <div class="form-group">
+                            <label>Institution Name</label>
+                            <input type="text" class="institution-name" placeholder="University or School Name" spellcheck="true">
+                        </div>
+                        <div class="form-group">
+                            <label>Degree / Program</label>
+                            <input type="text" class="degree" placeholder="Degree and Major" spellcheck="true">
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="text" class="edu-date" placeholder="Month Year">
+                        </div>
+                        <div class="form-group">
+                            <label>Additional Details (one per line)</label>
+                            <textarea class="edu-details" rows="3" placeholder="Minor, honors, GPA, relevant coursework&#10;Study abroad, certifications, etc." spellcheck="true"></textarea>
+                        </div>
+                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Education</button>
+                    </div>
+                </div>
+                <button class="add-btn" onclick="addEducation()">+ Add Education</button>
+            </section>
+
+            <div class="action-buttons">
+                <button class="generate-btn" onclick="generateResume()">Generate Resume</button>
+                <button class="export-btn" onclick="exportPDF()">Export to PDF</button>
+                <button class="check-btn" onclick="runSpellCheck()">Check Spelling & Get Suggestions</button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Preview and Suggestions -->
+        <div class="preview-panel">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="showTab('preview')">Resume Preview</button>
+                <button class="tab-btn" onclick="showTab('suggestions')">Spelling & Suggestions</button>
+            </div>
+
+            <div id="preview-tab" class="tab-content active">
+                <div id="resume-preview" class="resume-preview">
+                    <p class="placeholder-text">Fill out the form and click "Generate Resume" to see your preview</p>
+                </div>
+            </div>
+
+            <div id="suggestions-tab" class="tab-content">
+                <div class="suggestions-panel">
+                    <h3>Spelling Errors</h3>
+                    <div id="spelling-errors" class="suggestion-list">
+                        <p class="no-issues">No spelling errors found</p>
+                    </div>
+
+                    <h3>Word Improvement Suggestions</h3>
+                    <div id="word-suggestions" class="suggestion-list">
+                        <p class="no-issues">Click "Check Spelling & Get Suggestions" to analyze your resume</p>
+                    </div>
+
+                    <h3>Resume Tips</h3>
+                    <div id="resume-tips" class="suggestion-list">
+                        <ul>
+                            <li>Use action verbs to start bullet points</li>
+                            <li>Quantify achievements when possible</li>
+                            <li>Keep descriptions concise and impactful</li>
+                            <li>Tailor content to the target position</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

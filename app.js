@@ -1,0 +1,1192 @@
+// Resume Generator Application
+
+// ==========================================
+// FORM MANAGEMENT FUNCTIONS
+// ==========================================
+
+function addCertificate() {
+    const container = document.getElementById('certificates-container');
+    const entry = document.createElement('div');
+    entry.className = 'certificate-entry';
+    entry.innerHTML = `
+        <input type="text" class="certificate-input" placeholder="Enter certificate or rating..." spellcheck="true">
+        <button class="remove-btn" onclick="removeEntry(this)">×</button>
+    `;
+    container.appendChild(entry);
+}
+
+function addHours() {
+    const container = document.getElementById('hours-container');
+    const entry = document.createElement('div');
+    entry.className = 'hours-entry custom-hours';
+    entry.innerHTML = `
+        <input type="text" class="hours-label" placeholder="Custom Hour Type" spellcheck="true">
+        <input type="number" class="hours-value" placeholder="0">
+        <button class="remove-btn" onclick="removeEntry(this)">×</button>
+    `;
+    container.appendChild(entry);
+}
+
+function addExperience() {
+    const container = document.getElementById('experience-container');
+    const entry = document.createElement('div');
+    entry.className = 'experience-entry';
+    entry.innerHTML = `
+        <div class="form-group">
+            <label>Company Name</label>
+            <input type="text" class="company-name" placeholder="Company Name" spellcheck="true">
+        </div>
+        <div class="form-group">
+            <label>Job Title</label>
+            <input type="text" class="job-title" placeholder="Job Title" spellcheck="true">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Start Date</label>
+                <input type="text" class="start-date" placeholder="Month Year">
+            </div>
+            <div class="form-group">
+                <label>End Date</label>
+                <input type="text" class="end-date" placeholder="Present">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Responsibilities</label>
+            <div class="responsibilities-container">
+                <div class="bullet-entry">
+                    <span class="bullet-icon">•</span>
+                    <input type="text" class="bullet-input" placeholder="Start with action verbs like Developed, Led, Created" spellcheck="true">
+                    <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+                </div>
+            </div>
+            <button class="add-bullet-btn" onclick="addBullet(this)">+ Add Bullet Point</button>
+        </div>
+        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Job</button>
+    `;
+    container.appendChild(entry);
+}
+
+function addEducation() {
+    const container = document.getElementById('education-container');
+    const entry = document.createElement('div');
+    entry.className = 'education-entry';
+    entry.innerHTML = `
+        <div class="form-group">
+            <label>Institution Name</label>
+            <input type="text" class="institution-name" placeholder="University Name" spellcheck="true">
+        </div>
+        <div class="form-group">
+            <label>Degree / Program</label>
+            <input type="text" class="degree" placeholder="Bachelor of Science in..." spellcheck="true">
+        </div>
+        <div class="form-group">
+            <label>Date</label>
+            <input type="text" class="edu-date" placeholder="May 2024">
+        </div>
+        <div class="form-group">
+            <label>Additional Details (one per line)</label>
+            <textarea class="edu-details" rows="3" placeholder="Minor, honors, study abroad..." spellcheck="true"></textarea>
+        </div>
+        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Education</button>
+    `;
+    container.appendChild(entry);
+}
+
+function removeEntry(button) {
+    const entry = button.closest('.certificate-entry, .hours-entry, .experience-entry, .education-entry');
+    if (entry) {
+        entry.remove();
+    }
+}
+
+function addBullet(button) {
+    const container = button.previousElementSibling;
+    const bulletEntry = document.createElement('div');
+    bulletEntry.className = 'bullet-entry';
+    bulletEntry.innerHTML = `
+        <span class="bullet-icon">•</span>
+        <input type="text" class="bullet-input" placeholder="Add another responsibility..." spellcheck="true">
+        <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+    `;
+    container.appendChild(bulletEntry);
+    // Focus the new input
+    bulletEntry.querySelector('.bullet-input').focus();
+}
+
+function removeBullet(button) {
+    const bulletEntry = button.closest('.bullet-entry');
+    const container = bulletEntry.closest('.responsibilities-container');
+
+    // Don't remove if it's the last one
+    if (container.querySelectorAll('.bullet-entry').length > 1) {
+        bulletEntry.remove();
+    } else {
+        // Just clear the input if it's the last one
+        bulletEntry.querySelector('.bullet-input').value = '';
+    }
+}
+
+// ==========================================
+// TAB MANAGEMENT
+// ==========================================
+
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Show selected tab
+    document.getElementById(tabName + '-tab').classList.add('active');
+    event.target.classList.add('active');
+}
+
+// ==========================================
+// RESUME GENERATION
+// ==========================================
+
+function generateResume() {
+    const preview = document.getElementById('resume-preview');
+
+    // Gather data
+    const data = gatherFormData();
+
+    // Build contact line with proper separators
+    const contactParts = [];
+    if (data.address) contactParts.push(escapeHtml(data.address));
+    if (data.phone) contactParts.push(escapeHtml(data.phone));
+    if (data.email) contactParts.push(escapeHtml(data.email));
+    const contactLine = contactParts.join(' | ');
+
+    // Generate HTML
+    let html = `
+        <div class="resume-document">
+            <div class="resume-header">
+                <div class="resume-name">${escapeHtml(data.fullName)}</div>
+                <div class="resume-contact">${contactLine}</div>
+            </div>
+    `;
+
+    // Certificates and Hours section
+    if (data.certificates.length > 0 || data.hours.length > 0) {
+        html += `
+            <div class="resume-section">
+                <div class="certs-hours-container">
+                    <div class="certs-column">
+                        <h4>Certificates and Ratings</h4>
+                        <hr style="margin-bottom: 8px;">
+                        <ul class="cert-list">
+                            ${data.certificates.map(cert => `<li>${escapeHtml(cert)}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div class="hours-column">
+                        <h4>Hours</h4>
+                        <hr style="margin-bottom: 8px;">
+                        <div class="hours-list">
+                            ${data.hours.map(h => `
+                                <div class="hours-item">
+                                    <span class="hours-label-display">${escapeHtml(h.label)}</span>
+                                    <span class="hours-dots"></span>
+                                    <span class="hours-value-display">${escapeHtml(h.value)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Work Experience section
+    if (data.experience.length > 0) {
+        html += `
+            <div class="resume-section">
+                <div class="resume-section-title">Work Experience</div>
+                ${data.experience.map(job => `
+                    <div class="job-entry">
+                        <div class="job-header">
+                            <span class="company-name-display">${escapeHtml(job.company)}</span>
+                            <span class="job-dates">${escapeHtml(job.startDate)}${job.endDate ? ' - ' + escapeHtml(job.endDate) : ''}</span>
+                        </div>
+                        <div class="job-title-display">${escapeHtml(job.title)}</div>
+                        <ul class="responsibilities-list">
+                            ${job.responsibilities.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+                        </ul>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // Education section
+    if (data.education.length > 0) {
+        html += `
+            <div class="resume-section">
+                <div class="resume-section-title">Education</div>
+                ${data.education.map(edu => `
+                    <div class="edu-entry">
+                        <div class="edu-header">
+                            <span class="institution-display">${escapeHtml(edu.institution)}</span>
+                            <span class="edu-dates">${escapeHtml(edu.date)}</span>
+                        </div>
+                        <div class="degree-display">${escapeHtml(edu.degree)}</div>
+                        ${edu.details.length > 0 ? `
+                            <ul class="edu-details-list">
+                                ${edu.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    preview.innerHTML = html;
+}
+
+function gatherFormData() {
+    return {
+        fullName: document.getElementById('fullName').value || 'Your Name',
+        address: document.getElementById('address').value || '',
+        phone: document.getElementById('phone').value || '',
+        email: document.getElementById('email').value || '',
+        certificates: Array.from(document.querySelectorAll('.certificate-input'))
+            .map(input => input.value.trim())
+            .filter(v => v),
+        hours: Array.from(document.querySelectorAll('.hours-entry'))
+            .map(entry => {
+                const fixedLabel = entry.querySelector('.hours-label-fixed');
+                const customLabel = entry.querySelector('.hours-label');
+                const valueInput = entry.querySelector('.hours-value');
+
+                let label = '';
+                if (fixedLabel) {
+                    label = fixedLabel.textContent.trim();
+                } else if (customLabel) {
+                    label = customLabel.value.trim();
+                } else if (valueInput && valueInput.dataset.label) {
+                    label = valueInput.dataset.label;
+                }
+
+                return {
+                    label: label,
+                    value: valueInput ? valueInput.value.trim() : ''
+                };
+            })
+            .filter(h => h.label && h.value),
+        experience: Array.from(document.querySelectorAll('.experience-entry'))
+            .map(entry => ({
+                company: entry.querySelector('.company-name').value.trim(),
+                title: entry.querySelector('.job-title').value.trim(),
+                startDate: entry.querySelector('.start-date').value.trim(),
+                endDate: entry.querySelector('.end-date').value.trim(),
+                responsibilities: Array.from(entry.querySelectorAll('.bullet-input'))
+                    .map(input => input.value.trim())
+                    .filter(r => r)
+            }))
+            .filter(job => job.company || job.title),
+        education: Array.from(document.querySelectorAll('.education-entry'))
+            .map(entry => ({
+                institution: entry.querySelector('.institution-name').value.trim(),
+                degree: entry.querySelector('.degree').value.trim(),
+                date: entry.querySelector('.edu-date').value.trim(),
+                details: entry.querySelector('.edu-details').value
+                    .split('\n')
+                    .map(d => d.trim())
+                    .filter(d => d)
+            }))
+            .filter(edu => edu.institution || edu.degree)
+    };
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ==========================================
+// PDF EXPORT
+// ==========================================
+
+function exportPDF() {
+    const element = document.getElementById('resume-preview');
+
+    if (element.querySelector('.placeholder-text')) {
+        alert('Please generate your resume first before exporting to PDF.');
+        return;
+    }
+
+    const opt = {
+        margin: [0.5, 0.5, 0.5, 0.5],
+        filename: 'resume.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save();
+}
+
+// ==========================================
+// SPELL CHECK AND WORD SUGGESTIONS
+// ==========================================
+
+// Common misspellings dictionary
+const commonMisspellings = {
+    'recieve': 'receive',
+    'occured': 'occurred',
+    'occurence': 'occurrence',
+    'seperate': 'separate',
+    'definately': 'definitely',
+    'accomodate': 'accommodate',
+    'acheive': 'achieve',
+    'agressive': 'aggressive',
+    'apparant': 'apparent',
+    'calender': 'calendar',
+    'collegue': 'colleague',
+    'commited': 'committed',
+    'concensus': 'consensus',
+    'consistant': 'consistent',
+    'embarass': 'embarrass',
+    'enviroment': 'environment',
+    'experiance': 'experience',
+    'goverment': 'government',
+    'grammer': 'grammar',
+    'harrass': 'harass',
+    'immediatly': 'immediately',
+    'independant': 'independent',
+    'liason': 'liaison',
+    'maintainance': 'maintenance',
+    'managment': 'management',
+    'millenium': 'millennium',
+    'neccessary': 'necessary',
+    'noticable': 'noticeable',
+    'occassion': 'occasion',
+    'paralel': 'parallel',
+    'persue': 'pursue',
+    'posession': 'possession',
+    'prefered': 'preferred',
+    'privelege': 'privilege',
+    'profesional': 'professional',
+    'publically': 'publicly',
+    'recomend': 'recommend',
+    'refered': 'referred',
+    'relevent': 'relevant',
+    'responsiblity': 'responsibility',
+    'succesful': 'successful',
+    'supercede': 'supersede',
+    'tommorow': 'tomorrow',
+    'transfered': 'transferred',
+    'untill': 'until',
+    'wierd': 'weird',
+    'writting': 'writing',
+    'analisis': 'analysis',
+    'analize': 'analyze',
+    'beleive': 'believe',
+    'buisness': 'business',
+    'catagory': 'category',
+    'comunicate': 'communicate',
+    'develope': 'develop',
+    'diferent': 'different',
+    'efective': 'effective',
+    'excercise': 'exercise',
+    'finacial': 'financial',
+    'foriegn': 'foreign',
+    'garantee': 'guarantee',
+    'hieght': 'height',
+    'knowlege': 'knowledge',
+    'liscense': 'license',
+    'mispell': 'misspell',
+    'necesary': 'necessary',
+    'oportunity': 'opportunity',
+    'performace': 'performance',
+    'personel': 'personnel',
+    'priviledge': 'privilege',
+    'proceedure': 'procedure',
+    'restaraunt': 'restaurant',
+    'shedule': 'schedule',
+    'similer': 'similar',
+    'sincerly': 'sincerely',
+    'specificly': 'specifically',
+    'strenght': 'strength',
+    'technicaly': 'technically',
+    'therefor': 'therefore',
+    'thier': 'their',
+    'truely': 'truly',
+    'usualy': 'usually',
+    'vaccum': 'vacuum',
+    'vegatables': 'vegetables',
+    'wether': 'whether'
+};
+
+// Weak words and their stronger alternatives
+const wordImprovements = {
+    'helped': ['assisted', 'supported', 'contributed to', 'facilitated'],
+    'worked': ['collaborated', 'partnered', 'executed', 'delivered'],
+    'did': ['accomplished', 'achieved', 'completed', 'executed'],
+    'made': ['created', 'developed', 'produced', 'established'],
+    'got': ['obtained', 'acquired', 'secured', 'achieved'],
+    'used': ['utilized', 'leveraged', 'employed', 'applied'],
+    'good': ['excellent', 'outstanding', 'exceptional', 'superior'],
+    'big': ['significant', 'substantial', 'major', 'considerable'],
+    'many': ['numerous', 'multiple', 'extensive', 'various'],
+    'very': ['highly', 'exceptionally', 'remarkably', 'extremely'],
+    'nice': ['pleasant', 'effective', 'beneficial', 'valuable'],
+    'bad': ['poor', 'inadequate', 'substandard', 'deficient'],
+    'things': ['tasks', 'responsibilities', 'objectives', 'deliverables'],
+    'stuff': ['materials', 'resources', 'components', 'elements'],
+    'hard': ['challenging', 'demanding', 'rigorous', 'intensive'],
+    'easy': ['straightforward', 'efficient', 'streamlined', 'seamless'],
+    'fast': ['rapid', 'swift', 'efficient', 'accelerated'],
+    'slow': ['gradual', 'measured', 'deliberate', 'methodical'],
+    'team': ['cross-functional team', 'collaborative team', 'department'],
+    'responsible for': ['led', 'managed', 'oversaw', 'spearheaded'],
+    'in charge of': ['directed', 'supervised', 'administered', 'orchestrated'],
+    'duties included': ['key accomplishments include', 'delivered results such as'],
+    'worked on': ['developed', 'implemented', 'executed', 'delivered'],
+    'dealt with': ['managed', 'resolved', 'addressed', 'handled'],
+    'looked at': ['analyzed', 'evaluated', 'assessed', 'examined'],
+    'put together': ['assembled', 'compiled', 'organized', 'coordinated'],
+    'came up with': ['developed', 'devised', 'created', 'formulated'],
+    'figured out': ['determined', 'identified', 'resolved', 'solved'],
+    'set up': ['established', 'implemented', 'configured', 'initiated'],
+    'took care of': ['managed', 'administered', 'handled', 'maintained']
+};
+
+// Action verbs for resume bullet points
+const actionVerbs = [
+    'Achieved', 'Administered', 'Analyzed', 'Coordinated', 'Created',
+    'Delivered', 'Designed', 'Developed', 'Directed', 'Established',
+    'Executed', 'Generated', 'Implemented', 'Improved', 'Increased',
+    'Initiated', 'Led', 'Managed', 'Optimized', 'Organized',
+    'Oversaw', 'Produced', 'Reduced', 'Resolved', 'Spearheaded',
+    'Streamlined', 'Supervised', 'Trained', 'Transformed'
+];
+
+function runSpellCheck() {
+    const spellingErrorsDiv = document.getElementById('spelling-errors');
+    const wordSuggestionsDiv = document.getElementById('word-suggestions');
+
+    // Clear previous results
+    spellingErrorsDiv.innerHTML = '';
+    wordSuggestionsDiv.innerHTML = '';
+
+    // Gather all text from the form
+    const allText = gatherAllText();
+
+    // Check for spelling errors
+    const spellingErrors = findSpellingErrors(allText);
+
+    // Check for word improvements
+    const improvements = findWordImprovements(allText);
+
+    // Check for weak bullet point starts
+    const bulletPointSuggestions = checkBulletPoints();
+
+    // Display spelling errors
+    if (spellingErrors.length === 0) {
+        spellingErrorsDiv.innerHTML = '<p class="no-issues">No spelling errors found!</p>';
+    } else {
+        spellingErrors.forEach(error => {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'spelling-error';
+            errorDiv.innerHTML = `
+                <span class="word">"${escapeHtml(error.word)}"</span> may be misspelled.
+                <div class="suggestions">
+                    Suggestion: <span class="suggestion-word" onclick="copyToClipboard('${escapeHtml(error.suggestion)}')">${escapeHtml(error.suggestion)}</span>
+                </div>
+            `;
+            spellingErrorsDiv.appendChild(errorDiv);
+        });
+    }
+
+    // Display word improvements
+    let allImprovements = [...improvements, ...bulletPointSuggestions];
+
+    if (allImprovements.length === 0) {
+        wordSuggestionsDiv.innerHTML = '<p class="no-issues">Your word choices look strong!</p>';
+    } else {
+        allImprovements.forEach(imp => {
+            const impDiv = document.createElement('div');
+            impDiv.className = 'word-improvement';
+            impDiv.innerHTML = `
+                <span class="original">"${escapeHtml(imp.original)}"</span>
+                <span class="arrow">→</span>
+                <span class="improved">"${escapeHtml(imp.suggestions[0])}"</span>
+                ${imp.suggestions.length > 1 ? `<br><span class="context">Other options: ${imp.suggestions.slice(1).join(', ')}</span>` : ''}
+                ${imp.context ? `<div class="context">${escapeHtml(imp.context)}</div>` : ''}
+            `;
+            wordSuggestionsDiv.appendChild(impDiv);
+        });
+    }
+
+    // Switch to suggestions tab
+    showTabDirect('suggestions');
+}
+
+function showTabDirect(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase().includes(tabName)) {
+            btn.classList.add('active');
+        }
+    });
+    document.getElementById(tabName + '-tab').classList.add('active');
+}
+
+function gatherAllText() {
+    const texts = [];
+
+    // Get all input values
+    document.querySelectorAll('input[type="text"], textarea').forEach(input => {
+        if (input.value.trim()) {
+            texts.push(input.value);
+        }
+    });
+
+    return texts.join(' ');
+}
+
+function findSpellingErrors(text) {
+    const errors = [];
+    const words = text.toLowerCase().split(/\s+/);
+
+    words.forEach(word => {
+        // Clean the word of punctuation
+        const cleanWord = word.replace(/[.,!?;:'"()]/g, '');
+
+        if (commonMisspellings[cleanWord]) {
+            // Check if we haven't already added this error
+            if (!errors.find(e => e.word === cleanWord)) {
+                errors.push({
+                    word: cleanWord,
+                    suggestion: commonMisspellings[cleanWord]
+                });
+            }
+        }
+    });
+
+    return errors;
+}
+
+function findWordImprovements(text) {
+    const improvements = [];
+    const lowerText = text.toLowerCase();
+
+    Object.keys(wordImprovements).forEach(weakWord => {
+        // Use word boundary regex to find whole word matches
+        const regex = new RegExp('\\b' + weakWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+
+        if (regex.test(lowerText)) {
+            improvements.push({
+                original: weakWord,
+                suggestions: wordImprovements[weakWord]
+            });
+        }
+    });
+
+    return improvements;
+}
+
+function checkBulletPoints() {
+    const suggestions = [];
+    const weakStarters = ['i ', 'my ', 'we ', 'our ', 'the '];
+
+    // Check responsibilities in work experience
+    document.querySelectorAll('.responsibilities').forEach(textarea => {
+        const lines = textarea.value.split('\n');
+
+        lines.forEach(line => {
+            const trimmedLine = line.trim().toLowerCase();
+
+            if (trimmedLine) {
+                // Check if line starts with a weak word
+                weakStarters.forEach(starter => {
+                    if (trimmedLine.startsWith(starter)) {
+                        suggestions.push({
+                            original: line.trim().substring(0, 30) + '...',
+                            suggestions: actionVerbs.slice(0, 4),
+                            context: 'Consider starting with a strong action verb instead'
+                        });
+                    }
+                });
+
+                // Check if first word is not capitalized (not an action verb pattern)
+                const firstWord = trimmedLine.split(' ')[0];
+                if (firstWord && !firstWord.match(/^[a-z]+ed$|^[a-z]+ing$/)) {
+                    // Check if it's a past tense verb (common in resumes)
+                    const pastTenseVerbs = ['managed', 'led', 'created', 'developed', 'implemented',
+                                           'analyzed', 'coordinated', 'designed', 'established', 'executed',
+                                           'generated', 'improved', 'increased', 'initiated', 'maintained',
+                                           'optimized', 'organized', 'oversaw', 'produced', 'reduced',
+                                           'resolved', 'spearheaded', 'streamlined', 'supervised', 'trained'];
+
+                    if (!pastTenseVerbs.includes(firstWord) &&
+                        !firstWord.match(/^[a-z]+ed$/) &&
+                        line.trim().length > 10) {
+                        // Only suggest if the line is substantial
+                        const exists = suggestions.find(s => s.original.includes(line.trim().substring(0, 20)));
+                        if (!exists && !weakStarters.some(s => trimmedLine.startsWith(s))) {
+                            // Check if starts with a verb-like word
+                            const commonNonVerbs = ['a', 'an', 'the', 'this', 'that', 'these', 'those'];
+                            if (commonNonVerbs.includes(firstWord)) {
+                                suggestions.push({
+                                    original: line.trim().substring(0, 30) + (line.trim().length > 30 ? '...' : ''),
+                                    suggestions: ['Start with an action verb like: ' + actionVerbs.slice(0, 3).join(', ')],
+                                    context: 'Bullet points are stronger when they begin with action verbs'
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    return suggestions;
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied "' + text + '" to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+}
+
+// ==========================================
+// INITIALIZATION
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Add real-time spell checking to textareas
+    document.querySelectorAll('textarea, input[type="text"]').forEach(element => {
+        element.addEventListener('blur', function() {
+            checkFieldSpelling(this);
+        });
+    });
+
+    // Add phone number auto-formatting
+    const phoneInput = document.getElementById('phone');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+            formatPhoneNumber(this);
+        });
+    }
+});
+
+function formatPhoneNumber(input) {
+    // Get only digits from the input
+    let digits = input.value.replace(/\D/g, '');
+
+    // Limit to 10 digits
+    digits = digits.substring(0, 10);
+
+    // Format as (XXX) XXX-XXXX
+    let formatted = '';
+    if (digits.length > 0) {
+        formatted = '(' + digits.substring(0, 3);
+    }
+    if (digits.length >= 3) {
+        formatted += ') ' + digits.substring(3, 6);
+    }
+    if (digits.length >= 6) {
+        formatted += '-' + digits.substring(6, 10);
+    }
+
+    input.value = formatted;
+}
+
+function checkFieldSpelling(field) {
+    const text = field.value.toLowerCase();
+    const words = text.split(/\s+/);
+    let hasError = false;
+
+    words.forEach(word => {
+        const cleanWord = word.replace(/[.,!?;:'"()]/g, '');
+        if (commonMisspellings[cleanWord]) {
+            hasError = true;
+        }
+    });
+
+    if (hasError) {
+        field.classList.add('spell-error-highlight');
+    } else {
+        field.classList.remove('spell-error-highlight');
+    }
+}
+
+// ==========================================
+// RESUME IMPORT FUNCTIONALITY
+// ==========================================
+
+// Initialize PDF.js worker
+if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+async function handleFileImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const statusDiv = document.getElementById('importStatus');
+    const fileNameSpan = document.getElementById('fileName');
+
+    fileNameSpan.textContent = file.name;
+    statusDiv.className = 'import-status loading';
+    statusDiv.textContent = 'Processing file...';
+
+    try {
+        let text = '';
+
+        if (file.name.endsWith('.pdf')) {
+            text = await extractTextFromPDF(file);
+        } else if (file.name.endsWith('.docx')) {
+            text = await extractTextFromDOCX(file);
+        } else {
+            throw new Error('Unsupported file type. Please use PDF or DOCX.');
+        }
+
+        // Parse the extracted text
+        const parsedData = parseResumeText(text);
+
+        // Populate the form
+        populateForm(parsedData);
+
+        statusDiv.className = 'import-status success';
+        statusDiv.textContent = 'Resume imported successfully! Review and edit the fields as needed.';
+
+    } catch (error) {
+        console.error('Import error:', error);
+        statusDiv.className = 'import-status error';
+        statusDiv.textContent = 'Error importing file: ' + error.message;
+    }
+}
+
+async function extractTextFromPDF(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+    }
+
+    return fullText;
+}
+
+async function extractTextFromDOCX(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+    return result.value;
+}
+
+function parseResumeText(text) {
+    const data = {
+        fullName: '',
+        address: '',
+        phone: '',
+        email: '',
+        certificates: [],
+        skills: [],
+        experience: [],
+        education: []
+    };
+
+    // Normalize text - fix common PDF extraction issues
+    text = text.replace(/\s+/g, ' ').trim();
+    const lines = text.split(/(?<=\.)\s+|\n/).map(l => l.trim()).filter(l => l);
+
+    // Extract email
+    const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/);
+    if (emailMatch) {
+        data.email = emailMatch[0];
+    }
+
+    // Extract phone number
+    const phoneMatch = text.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+    if (phoneMatch) {
+        data.phone = phoneMatch[0];
+    }
+
+    // Try to extract name (usually first line or before contact info)
+    const nameMatch = text.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/);
+    if (nameMatch) {
+        data.fullName = nameMatch[1];
+    }
+
+    // Extract address (look for city, state ZIP pattern)
+    const addressMatch = text.match(/[\w\s]+,?\s*[A-Z]{2},?\s*\d{5}/);
+    if (addressMatch) {
+        // Try to get more context around the address
+        const addressIndex = text.indexOf(addressMatch[0]);
+        const beforeAddress = text.substring(Math.max(0, addressIndex - 50), addressIndex);
+        const streetMatch = beforeAddress.match(/\d+[\w\s]+(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Dr|Drive|Ln|Lane|Way|Ct|Court)/i);
+        if (streetMatch) {
+            data.address = streetMatch[0] + ' ' + addressMatch[0];
+        } else {
+            data.address = addressMatch[0];
+        }
+    }
+
+    // Identify sections based on common headers
+    const sectionPatterns = {
+        experience: /work\s*experience|professional\s*experience|employment|experience/i,
+        education: /education|academic/i,
+        skills: /skills|technical\s*skills|competencies|expertise/i,
+        certificates: /certificates?|certifications?|licenses?|ratings?/i,
+        projects: /projects?|professional\s*projects/i,
+        objective: /objective|summary|profile|professional\s*objective/i
+    };
+
+    // Split text into sections
+    const sections = identifySections(text, sectionPatterns);
+
+    // Parse Work Experience
+    if (sections.experience) {
+        data.experience = parseExperienceSection(sections.experience);
+    }
+
+    // Parse Education
+    if (sections.education) {
+        data.education = parseEducationSection(sections.education);
+    }
+
+    // Parse Skills/Certificates
+    if (sections.skills) {
+        data.skills = parseSkillsSection(sections.skills);
+    }
+
+    if (sections.certificates) {
+        data.certificates = parseCertificatesSection(sections.certificates);
+    }
+
+    return data;
+}
+
+function identifySections(text, patterns) {
+    const sections = {};
+    const sectionStarts = [];
+
+    // Find all section headers
+    Object.keys(patterns).forEach(sectionName => {
+        const regex = new RegExp(patterns[sectionName].source, 'gi');
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            sectionStarts.push({
+                name: sectionName,
+                index: match.index,
+                header: match[0]
+            });
+        }
+    });
+
+    // Sort by position in text
+    sectionStarts.sort((a, b) => a.index - b.index);
+
+    // Extract content for each section
+    sectionStarts.forEach((section, i) => {
+        const startIndex = section.index + section.header.length;
+        const endIndex = i < sectionStarts.length - 1 ? sectionStarts[i + 1].index : text.length;
+        sections[section.name] = text.substring(startIndex, endIndex).trim();
+    });
+
+    return sections;
+}
+
+function parseExperienceSection(text) {
+    const experiences = [];
+
+    // Pattern to find job entries: Company, Title, Date range
+    const datePattern = /(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\s*[-–—to]+\s*(?:Present|Current|January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{0,4}/gi;
+
+    const dates = [...text.matchAll(datePattern)];
+
+    if (dates.length > 0) {
+        dates.forEach((dateMatch, index) => {
+            const dateStr = dateMatch[0];
+            const dateIndex = dateMatch.index;
+
+            // Find content before this date (company/title)
+            const prevDateEnd = index > 0 ? dates[index - 1].index + dates[index - 1][0].length : 0;
+            const headerText = text.substring(prevDateEnd, dateIndex).trim();
+
+            // Find content after this date until next date or section
+            const nextDateStart = index < dates.length - 1 ? dates[index + 1].index : text.length;
+            const contentText = text.substring(dateIndex + dateStr.length, nextDateStart).trim();
+
+            // Parse the date range
+            const dateParts = dateStr.split(/[-–—]|to/i).map(d => d.trim());
+            const startDate = dateParts[0] || '';
+            const endDate = dateParts[1] || 'Present';
+
+            // Try to extract company and title from header
+            const headerLines = headerText.split(/[,\n]/).map(l => l.trim()).filter(l => l);
+            let company = '';
+            let title = '';
+
+            if (headerLines.length >= 2) {
+                company = headerLines[headerLines.length - 2] || '';
+                title = headerLines[headerLines.length - 1] || '';
+            } else if (headerLines.length === 1) {
+                company = headerLines[0];
+            }
+
+            // Extract bullet points from content
+            const bullets = contentText
+                .split(/[•●○■◦▪-]\s*|\d+\.\s*/)
+                .map(b => b.trim())
+                .filter(b => b.length > 10 && !b.match(/^[A-Z]{2,},?\s*[A-Z]{2}/)); // Filter out locations
+
+            if (company || title || bullets.length > 0) {
+                experiences.push({
+                    company: company.replace(/[,.]$/, ''),
+                    title: title.replace(/[,.]$/, ''),
+                    startDate: startDate,
+                    endDate: endDate,
+                    responsibilities: bullets.slice(0, 10) // Limit to 10 bullets
+                });
+            }
+        });
+    }
+
+    return experiences;
+}
+
+function parseEducationSection(text) {
+    const education = [];
+
+    // Look for degree patterns
+    const degreePatterns = [
+        /(?:Bachelor|Master|Associate|Doctor|PhD|B\.?S\.?|B\.?A\.?|M\.?S\.?|M\.?A\.?|M\.?B\.?A\.?|Ph\.?D\.?)[^,.\n]*(?:in|of)[^,.\n]*/gi,
+        /(?:Bachelor|Master|Associate|Doctor|PhD)[^,.\n]*/gi
+    ];
+
+    const datePattern = /(?:May|December|August|January|Spring|Fall|Summer|Winter)?\s*\d{4}/gi;
+    const gpaPattern = /GPA[:\s]*(\d\.\d+)/i;
+
+    // Try to find education entries
+    let degrees = [];
+    degreePatterns.forEach(pattern => {
+        const matches = [...text.matchAll(pattern)];
+        degrees = degrees.concat(matches);
+    });
+
+    // Also look for university names
+    const universityPattern = /(?:University|College|Institute|School)[^,.\n]*/gi;
+    const universities = [...text.matchAll(universityPattern)];
+
+    // Combine and dedupe
+    const allMatches = [...degrees, ...universities].sort((a, b) => a.index - b.index);
+
+    if (allMatches.length > 0) {
+        // Group consecutive matches
+        let currentEdu = { institution: '', degree: '', date: '', details: [] };
+
+        allMatches.forEach((match, i) => {
+            const matchText = match[0].trim();
+
+            if (matchText.match(/University|College|Institute|School/i)) {
+                if (currentEdu.institution && currentEdu.degree) {
+                    education.push({ ...currentEdu });
+                    currentEdu = { institution: '', degree: '', date: '', details: [] };
+                }
+                currentEdu.institution = matchText;
+            } else {
+                currentEdu.degree = matchText;
+            }
+
+            // Look for date near this match
+            const nearbyText = text.substring(match.index, Math.min(match.index + 100, text.length));
+            const dateMatch = nearbyText.match(datePattern);
+            if (dateMatch) {
+                currentEdu.date = dateMatch[0];
+            }
+
+            // Look for GPA
+            const gpaMatch = nearbyText.match(gpaPattern);
+            if (gpaMatch) {
+                currentEdu.details.push('GPA: ' + gpaMatch[1]);
+            }
+        });
+
+        // Don't forget the last one
+        if (currentEdu.institution || currentEdu.degree) {
+            education.push(currentEdu);
+        }
+    }
+
+    return education;
+}
+
+function parseSkillsSection(text) {
+    // Split by common delimiters
+    const skills = text
+        .split(/[•●○■◦▪,\n]/)
+        .map(s => s.trim())
+        .filter(s => s.length > 2 && s.length < 100);
+
+    return skills;
+}
+
+function parseCertificatesSection(text) {
+    const certs = text
+        .split(/[•●○■◦▪\n]/)
+        .map(c => c.trim())
+        .filter(c => c.length > 5 && c.length < 200);
+
+    return certs;
+}
+
+function populateForm(data) {
+    // Clear existing entries first (except the first one in each section)
+    clearExistingEntries();
+
+    // Personal Information
+    if (data.fullName) {
+        document.getElementById('fullName').value = data.fullName;
+    }
+    if (data.address) {
+        document.getElementById('address').value = data.address;
+    }
+    if (data.phone) {
+        document.getElementById('phone').value = data.phone;
+    }
+    if (data.email) {
+        document.getElementById('email').value = data.email;
+    }
+
+    // Certificates
+    if (data.certificates && data.certificates.length > 0) {
+        const certsContainer = document.getElementById('certificates-container');
+        certsContainer.innerHTML = ''; // Clear existing
+
+        data.certificates.forEach(cert => {
+            const entry = document.createElement('div');
+            entry.className = 'certificate-entry';
+            entry.innerHTML = `
+                <input type="text" class="certificate-input" value="${escapeHtmlAttr(cert)}" spellcheck="true">
+                <button class="remove-btn" onclick="removeEntry(this)">×</button>
+            `;
+            certsContainer.appendChild(entry);
+        });
+    }
+
+    // Work Experience
+    if (data.experience && data.experience.length > 0) {
+        const expContainer = document.getElementById('experience-container');
+        expContainer.innerHTML = ''; // Clear existing
+
+        data.experience.forEach(job => {
+            const entry = document.createElement('div');
+            entry.className = 'experience-entry';
+
+            // Build bullet points HTML
+            const bulletsHtml = job.responsibilities.length > 0
+                ? job.responsibilities.map(r => `
+                    <div class="bullet-entry">
+                        <span class="bullet-icon">•</span>
+                        <input type="text" class="bullet-input" value="${escapeHtmlAttr(r)}" spellcheck="true">
+                        <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+                    </div>
+                `).join('')
+                : `
+                    <div class="bullet-entry">
+                        <span class="bullet-icon">•</span>
+                        <input type="text" class="bullet-input" placeholder="Add a responsibility..." spellcheck="true">
+                        <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+                    </div>
+                `;
+
+            entry.innerHTML = `
+                <div class="form-group">
+                    <label>Company Name</label>
+                    <input type="text" class="company-name" value="${escapeHtmlAttr(job.company)}" spellcheck="true">
+                </div>
+                <div class="form-group">
+                    <label>Job Title</label>
+                    <input type="text" class="job-title" value="${escapeHtmlAttr(job.title)}" spellcheck="true">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="text" class="start-date" value="${escapeHtmlAttr(job.startDate)}">
+                    </div>
+                    <div class="form-group">
+                        <label>End Date</label>
+                        <input type="text" class="end-date" value="${escapeHtmlAttr(job.endDate)}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Responsibilities</label>
+                    <div class="responsibilities-container">
+                        ${bulletsHtml}
+                    </div>
+                    <button class="add-bullet-btn" onclick="addBullet(this)">+ Add Bullet Point</button>
+                </div>
+                <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Job</button>
+            `;
+            expContainer.appendChild(entry);
+        });
+    }
+
+    // Education
+    if (data.education && data.education.length > 0) {
+        const eduContainer = document.getElementById('education-container');
+        eduContainer.innerHTML = ''; // Clear existing
+
+        data.education.forEach(edu => {
+            const entry = document.createElement('div');
+            entry.className = 'education-entry';
+            entry.innerHTML = `
+                <div class="form-group">
+                    <label>Institution Name</label>
+                    <input type="text" class="institution-name" value="${escapeHtmlAttr(edu.institution)}" spellcheck="true">
+                </div>
+                <div class="form-group">
+                    <label>Degree / Program</label>
+                    <input type="text" class="degree" value="${escapeHtmlAttr(edu.degree)}" spellcheck="true">
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="text" class="edu-date" value="${escapeHtmlAttr(edu.date)}">
+                </div>
+                <div class="form-group">
+                    <label>Additional Details (one per line)</label>
+                    <textarea class="edu-details" rows="3" spellcheck="true">${escapeHtmlAttr(edu.details.join('\n'))}</textarea>
+                </div>
+                <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Education</button>
+            `;
+            eduContainer.appendChild(entry);
+        });
+    }
+
+    // Auto-generate preview after import
+    generateResume();
+}
+
+function clearExistingEntries() {
+    // We'll replace the contents entirely in populateForm, so this is just a helper
+}
+
+function escapeHtmlAttr(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
