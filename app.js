@@ -137,11 +137,13 @@ function showTab(tabName) {
     });
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
+        if (btn.textContent.toLowerCase().includes(tabName)) {
+            btn.classList.add('active');
+        }
     });
 
     // Show selected tab
     document.getElementById(tabName + '-tab').classList.add('active');
-    event.target.classList.add('active');
 }
 
 // ==========================================
@@ -314,22 +316,241 @@ function escapeHtml(text) {
 // ==========================================
 
 function exportPDF() {
-    const element = document.getElementById('resume-preview');
+    const preview = document.getElementById('resume-preview');
 
-    if (element.querySelector('.placeholder-text')) {
+    if (preview.querySelector('.placeholder-text')) {
         alert('Please generate your resume first before exporting to PDF.');
         return;
     }
 
-    const opt = {
-        margin: [0.5, 0.5, 0.5, 0.5],
-        filename: 'resume.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
+    const data = gatherFormData();
+    if (!data.fullName || data.fullName === 'Your Name') {
+        alert('Please fill in your resume details first.');
+        return;
+    }
 
-    html2pdf().set(opt).from(element).save();
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+        // Letter size: 612 x 792 points
+        const pageW = 612;
+        const pageH = 792;
+        const margin = 40;
+        const contentW = pageW - margin * 2;
+        let y = margin;
+
+        // Helper: add a new page if needed
+        function checkPage(needed) {
+            if (y + needed > pageH - margin) {
+                doc.addPage();
+                y = margin;
+            }
+        }
+
+        // Helper: wrap text and return lines
+        function getWrappedLines(text, maxWidth) {
+            return doc.splitTextToSize(text, maxWidth);
+        }
+
+        // --- HEADER ---
+        // Name
+        doc.setFont('times', 'bold');
+        doc.setFontSize(22);
+        doc.text(data.fullName, pageW / 2, y, { align: 'center' });
+        y += 20;
+
+        // Contact line
+        const contactParts = [];
+        if (data.address) contactParts.push(data.address);
+        if (data.phone) contactParts.push(data.phone);
+        if (data.email) contactParts.push(data.email);
+        if (contactParts.length > 0) {
+            doc.setFont('times', 'normal');
+            doc.setFontSize(10);
+            doc.text(contactParts.join('  |  '), pageW / 2, y, { align: 'center' });
+        }
+        y += 18;
+
+        // --- CERTIFICATES & HOURS (side by side) ---
+        if (data.certificates.length > 0 || data.hours.length > 0) {
+            const colW = contentW / 2 - 10;
+            const startY = y;
+
+            // Certificates column
+            if (data.certificates.length > 0) {
+                doc.setFont('times', 'bold');
+                doc.setFontSize(11);
+                doc.text('Certificates and Ratings', margin, y);
+                y += 3;
+                doc.setLineWidth(0.5);
+                doc.line(margin, y, margin + colW, y);
+                y += 10;
+
+                doc.setFont('times', 'normal');
+                doc.setFontSize(9);
+                data.certificates.forEach(cert => {
+                    checkPage(12);
+                    const lines = getWrappedLines(cert, colW - 15);
+                    lines.forEach((line, i) => {
+                        if (i === 0) {
+                            doc.text('\u2022  ' + line, margin + 5, y);
+                        } else {
+                            doc.text('   ' + line, margin + 5, y);
+                        }
+                        y += 11;
+                    });
+                });
+            }
+
+            const certsEndY = y;
+
+            // Hours column
+            if (data.hours.length > 0) {
+                y = startY;
+                const hoursX = margin + colW + 20;
+
+                doc.setFont('times', 'bold');
+                doc.setFontSize(11);
+                doc.text('Hours', hoursX, y);
+                y += 3;
+                doc.setLineWidth(0.5);
+                doc.line(hoursX, y, hoursX + colW, y);
+                y += 10;
+
+                doc.setFont('times', 'normal');
+                doc.setFontSize(9);
+                data.hours.forEach(h => {
+                    checkPage(12);
+                    const labelW = doc.getTextWidth(h.label);
+                    const valueW = doc.getTextWidth(h.value);
+                    doc.text(h.label, hoursX, y);
+                    doc.text(h.value, hoursX + colW, y, { align: 'right' });
+
+                    // Dot leader between label and value
+                    const dotsStart = hoursX + labelW + 5;
+                    const dotsEnd = hoursX + colW - valueW - 5;
+                    if (dotsEnd > dotsStart) {
+                        let dotX = dotsStart;
+                        doc.setFontSize(7);
+                        while (dotX < dotsEnd) {
+                            doc.text('.', dotX, y);
+                            dotX += 3;
+                        }
+                        doc.setFontSize(9);
+                    }
+                    y += 11;
+                });
+            }
+
+            y = Math.max(y, certsEndY) + 8;
+        }
+
+        // --- WORK EXPERIENCE ---
+        if (data.experience.length > 0) {
+            checkPage(30);
+            doc.setFont('times', 'bold');
+            doc.setFontSize(12);
+            doc.text('Work Experience', margin, y);
+            y += 3;
+            doc.setLineWidth(0.75);
+            doc.line(margin, y, pageW - margin, y);
+            y += 12;
+
+            data.experience.forEach(job => {
+                checkPage(40);
+
+                // Company and dates on same line
+                doc.setFont('times', 'bold');
+                doc.setFontSize(10);
+                doc.text(job.company, margin, y);
+                const dateStr = job.startDate + (job.endDate ? ' - ' + job.endDate : '');
+                doc.setFont('times', 'normal');
+                doc.text(dateStr, pageW - margin, y, { align: 'right' });
+                y += 13;
+
+                // Job title
+                doc.setFont('times', 'italic');
+                doc.setFontSize(10);
+                doc.text(job.title, margin, y);
+                y += 12;
+
+                // Bullet points
+                doc.setFont('times', 'normal');
+                doc.setFontSize(9);
+                job.responsibilities.forEach(r => {
+                    checkPage(12);
+                    const lines = getWrappedLines(r, contentW - 20);
+                    lines.forEach((line, i) => {
+                        if (i === 0) {
+                            doc.text('\u2022  ' + line, margin + 10, y);
+                        } else {
+                            doc.text('   ' + line, margin + 10, y);
+                        }
+                        y += 11;
+                    });
+                });
+                y += 5;
+            });
+        }
+
+        // --- EDUCATION ---
+        if (data.education.length > 0) {
+            checkPage(30);
+            doc.setFont('times', 'bold');
+            doc.setFontSize(12);
+            doc.text('Education', margin, y);
+            y += 3;
+            doc.setLineWidth(0.75);
+            doc.line(margin, y, pageW - margin, y);
+            y += 12;
+
+            data.education.forEach(edu => {
+                checkPage(30);
+
+                // Institution and date
+                doc.setFont('times', 'bold');
+                doc.setFontSize(10);
+                doc.text(edu.institution, margin, y);
+                doc.setFont('times', 'normal');
+                doc.text(edu.date, pageW - margin, y, { align: 'right' });
+                y += 13;
+
+                // Degree
+                doc.setFont('times', 'italic');
+                doc.setFontSize(10);
+                doc.text(edu.degree, margin, y);
+                y += 12;
+
+                // Details
+                if (edu.details.length > 0) {
+                    doc.setFont('times', 'normal');
+                    doc.setFontSize(9);
+                    edu.details.forEach(d => {
+                        checkPage(12);
+                        const lines = getWrappedLines(d, contentW - 20);
+                        lines.forEach((line, i) => {
+                            if (i === 0) {
+                                doc.text('\u2022  ' + line, margin + 10, y);
+                            } else {
+                                doc.text('   ' + line, margin + 10, y);
+                            }
+                            y += 11;
+                        });
+                    });
+                }
+                y += 5;
+            });
+        }
+
+        // Generate filename from the person's name
+        const filename = data.fullName.replace(/\s+/g, '_') + '_Resume.pdf';
+        doc.save(filename);
+
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        alert('Error generating PDF: ' + error.message);
+    }
 }
 
 // ==========================================
@@ -600,55 +821,47 @@ function checkBulletPoints() {
     const suggestions = [];
     const weakStarters = ['i ', 'my ', 'we ', 'our ', 'the '];
 
-    // Check responsibilities in work experience
-    document.querySelectorAll('.responsibilities').forEach(textarea => {
-        const lines = textarea.value.split('\n');
+    // Check responsibilities in work experience (each bullet is a .bullet-input)
+    document.querySelectorAll('.bullet-input').forEach(input => {
+        const line = input.value.trim();
+        if (!line) return;
 
-        lines.forEach(line => {
-            const trimmedLine = line.trim().toLowerCase();
+        const trimmedLine = line.toLowerCase();
 
-            if (trimmedLine) {
-                // Check if line starts with a weak word
-                weakStarters.forEach(starter => {
-                    if (trimmedLine.startsWith(starter)) {
-                        suggestions.push({
-                            original: line.trim().substring(0, 30) + '...',
-                            suggestions: actionVerbs.slice(0, 4),
-                            context: 'Consider starting with a strong action verb instead'
-                        });
-                    }
+        // Check if line starts with a weak word
+        weakStarters.forEach(starter => {
+            if (trimmedLine.startsWith(starter)) {
+                suggestions.push({
+                    original: line.substring(0, 30) + (line.length > 30 ? '...' : ''),
+                    suggestions: actionVerbs.slice(0, 4),
+                    context: 'Consider starting with a strong action verb instead'
                 });
-
-                // Check if first word is not capitalized (not an action verb pattern)
-                const firstWord = trimmedLine.split(' ')[0];
-                if (firstWord && !firstWord.match(/^[a-z]+ed$|^[a-z]+ing$/)) {
-                    // Check if it's a past tense verb (common in resumes)
-                    const pastTenseVerbs = ['managed', 'led', 'created', 'developed', 'implemented',
-                                           'analyzed', 'coordinated', 'designed', 'established', 'executed',
-                                           'generated', 'improved', 'increased', 'initiated', 'maintained',
-                                           'optimized', 'organized', 'oversaw', 'produced', 'reduced',
-                                           'resolved', 'spearheaded', 'streamlined', 'supervised', 'trained'];
-
-                    if (!pastTenseVerbs.includes(firstWord) &&
-                        !firstWord.match(/^[a-z]+ed$/) &&
-                        line.trim().length > 10) {
-                        // Only suggest if the line is substantial
-                        const exists = suggestions.find(s => s.original.includes(line.trim().substring(0, 20)));
-                        if (!exists && !weakStarters.some(s => trimmedLine.startsWith(s))) {
-                            // Check if starts with a verb-like word
-                            const commonNonVerbs = ['a', 'an', 'the', 'this', 'that', 'these', 'those'];
-                            if (commonNonVerbs.includes(firstWord)) {
-                                suggestions.push({
-                                    original: line.trim().substring(0, 30) + (line.trim().length > 30 ? '...' : ''),
-                                    suggestions: ['Start with an action verb like: ' + actionVerbs.slice(0, 3).join(', ')],
-                                    context: 'Bullet points are stronger when they begin with action verbs'
-                                });
-                            }
-                        }
-                    }
-                }
             }
         });
+
+        // Check if first word is not a strong action verb
+        const firstWord = trimmedLine.split(' ')[0];
+        if (firstWord && line.length > 10) {
+            const pastTenseVerbs = ['managed', 'led', 'created', 'developed', 'implemented',
+                                   'analyzed', 'coordinated', 'designed', 'established', 'executed',
+                                   'generated', 'improved', 'increased', 'initiated', 'maintained',
+                                   'optimized', 'organized', 'oversaw', 'produced', 'reduced',
+                                   'resolved', 'spearheaded', 'streamlined', 'supervised', 'trained',
+                                   'achieved', 'administered', 'delivered', 'directed'];
+
+            const commonNonVerbs = ['a', 'an', 'the', 'this', 'that', 'these', 'those'];
+            if (commonNonVerbs.includes(firstWord) &&
+                !weakStarters.some(s => trimmedLine.startsWith(s))) {
+                const exists = suggestions.find(s => s.original.includes(line.substring(0, 20)));
+                if (!exists) {
+                    suggestions.push({
+                        original: line.substring(0, 30) + (line.length > 30 ? '...' : ''),
+                        suggestions: ['Start with an action verb like: ' + actionVerbs.slice(0, 3).join(', ')],
+                        context: 'Bullet points are stronger when they begin with action verbs'
+                    });
+                }
+            }
+        }
     });
 
     return suggestions;
@@ -780,8 +993,25 @@ async function extractTextFromPDF(file) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
-        fullText += pageText + '\n';
+
+        // Use y-coordinates to detect line breaks
+        let lastY = null;
+        let lineText = '';
+
+        textContent.items.forEach(item => {
+            if (lastY !== null && Math.abs(item.transform[5] - lastY) > 2) {
+                // Y position changed significantly — new line
+                fullText += lineText.trim() + '\n';
+                lineText = '';
+            }
+            lineText += item.str + ' ';
+            lastY = item.transform[5];
+        });
+
+        if (lineText.trim()) {
+            fullText += lineText.trim() + '\n';
+        }
+        fullText += '\n';
     }
 
     return fullText;
@@ -805,39 +1035,50 @@ function parseResumeText(text) {
         education: []
     };
 
-    // Normalize text - fix common PDF extraction issues
-    text = text.replace(/\s+/g, ' ').trim();
-    const lines = text.split(/(?<=\.)\s+|\n/).map(l => l.trim()).filter(l => l);
+    // Normalize text - preserve line breaks for structure, only collapse horizontal whitespace
+    const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(l => l);
+    const flatText = lines.join(' ');
 
     // Extract email
-    const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/);
+    const emailMatch = flatText.match(/[\w.-]+@[\w.-]+\.\w+/);
     if (emailMatch) {
         data.email = emailMatch[0];
     }
 
     // Extract phone number
-    const phoneMatch = text.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+    const phoneMatch = flatText.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
     if (phoneMatch) {
         data.phone = phoneMatch[0];
     }
 
-    // Try to extract name (usually first line or before contact info)
-    const nameMatch = text.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/);
-    if (nameMatch) {
-        data.fullName = nameMatch[1];
+    // Try to extract name (usually first non-empty line)
+    // Handles: "Title Case", "ALL CAPS", hyphenated, and suffixes like Jr./III
+    if (lines.length > 0) {
+        const firstLine = lines[0];
+        const nameMatch = firstLine.match(/^([A-Za-z][A-Za-z'-]+(?:\s+[A-Za-z][A-Za-z'-]+)+(?:\s+(?:Jr\.?|Sr\.?|II|III|IV))?)\s*$/i);
+        if (nameMatch) {
+            data.fullName = nameMatch[1].trim();
+        } else {
+            // Fallback: look in first few lines for a name-like pattern
+            for (let i = 0; i < Math.min(lines.length, 5); i++) {
+                const match = lines[i].match(/^([A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+){1,3})\s*$/);
+                if (match && !match[1].match(/@|www\.|http|\d{3}/)) {
+                    data.fullName = match[1];
+                    break;
+                }
+            }
+        }
     }
 
-    // Extract address (look for city, state ZIP pattern)
-    const addressMatch = text.match(/[\w\s]+,?\s*[A-Z]{2},?\s*\d{5}/);
+    // Extract address (look for street number + city, state ZIP pattern)
+    const addressMatch = flatText.match(/\d+[^,\n]{3,40},\s*[A-Za-z\s]+,?\s*[A-Z]{2},?\s*\d{5}(?:-\d{4})?/);
     if (addressMatch) {
-        // Try to get more context around the address
-        const addressIndex = text.indexOf(addressMatch[0]);
-        const beforeAddress = text.substring(Math.max(0, addressIndex - 50), addressIndex);
-        const streetMatch = beforeAddress.match(/\d+[\w\s]+(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Dr|Drive|Ln|Lane|Way|Ct|Court)/i);
-        if (streetMatch) {
-            data.address = streetMatch[0] + ' ' + addressMatch[0];
-        } else {
-            data.address = addressMatch[0];
+        data.address = addressMatch[0].trim();
+    } else {
+        // Fallback: just city, state ZIP
+        const cityStateZip = flatText.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,?\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?/);
+        if (cityStateZip) {
+            data.address = cityStateZip[0].trim();
         }
     }
 
@@ -851,8 +1092,9 @@ function parseResumeText(text) {
         objective: /objective|summary|profile|professional\s*objective/i
     };
 
-    // Split text into sections
-    const sections = identifySections(text, sectionPatterns);
+    // Split text into sections (use line-based text to preserve structure)
+    const lineText = lines.join('\n');
+    const sections = identifySections(lineText, sectionPatterns);
 
     // Parse Work Experience
     if (sections.experience) {
