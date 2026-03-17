@@ -163,10 +163,83 @@
                 <button class="add-btn" onclick="addEducation()">+ Add Education</button>
             </section>
 
+            <!-- Aviation Training -->
+            <section class="form-section">
+                <h2>Aviation Training & Education</h2>
+                <div id="training-container">
+                    <div class="training-entry">
+                        <div class="form-group">
+                            <label>School / Training Provider</label>
+                            <input type="text" class="training-school" placeholder="ATP Flight School, FlightSafety International..." spellcheck="true">
+                        </div>
+                        <div class="form-group">
+                            <label>Program / Course</label>
+                            <input type="text" class="training-program" placeholder="Multi-Engine Rating, Part 141 Private Pilot..." spellcheck="true">
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="text" class="training-date" placeholder="Month Year">
+                        </div>
+                        <div class="form-group">
+                            <label>Additional Details (one per line)</label>
+                            <textarea class="training-details" rows="2" placeholder="Aircraft types, honors, achievements..." spellcheck="true"></textarea>
+                        </div>
+                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Training</button>
+                    </div>
+                </div>
+                <button class="add-btn" onclick="addTraining()">+ Add Training</button>
+            </section>
+
+            <!-- Volunteer Experience & Community Involvement -->
+            <section class="form-section">
+                <h2>Volunteer Experience & Community Involvement</h2>
+                <div id="volunteer-container">
+                    <div class="volunteer-entry">
+                        <div class="form-group">
+                            <label>Organization</label>
+                            <input type="text" class="volunteer-org" placeholder="Organization Name" spellcheck="true">
+                        </div>
+                        <div class="form-group">
+                            <label>Role</label>
+                            <input type="text" class="volunteer-role" placeholder="Volunteer Role or Title" spellcheck="true">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="text" class="volunteer-start" placeholder="Month Year">
+                            </div>
+                            <div class="form-group">
+                                <label>End Date</label>
+                                <input type="text" class="volunteer-end" placeholder="Present">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <div class="responsibilities-container">
+                                <div class="bullet-entry">
+                                    <span class="bullet-icon">•</span>
+                                    <input type="text" class="bullet-input" placeholder="Organized community outreach events..." spellcheck="true">
+                                    <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+                                </div>
+                            </div>
+                            <button class="add-bullet-btn" onclick="addBullet(this)">+ Add Bullet Point</button>
+                        </div>
+                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Entry</button>
+                    </div>
+                </div>
+                <button class="add-btn" onclick="addVolunteer()">+ Add Volunteer Experience</button>
+            </section>
+
             <div class="action-buttons">
                 <button class="generate-btn" onclick="generateResume()">Generate Resume</button>
                 <button class="export-btn" onclick="exportPDF()">Export to PDF</button>
                 <button class="check-btn" onclick="runSpellCheck()">Check Spelling & Get Suggestions</button>
+            </div>
+            <div class="action-buttons" style="margin-top: 8px;">
+                <button class="save-btn" onclick="saveFormData()">Save Progress</button>
+                <button class="save-btn" onclick="exportFormJSON()">Export Data (JSON)</button>
+                <button class="save-btn" onclick="document.getElementById('importJSON').click()">Load Data (JSON)</button>
+                <input type="file" id="importJSON" accept=".json" onchange="importFormJSON(event)" style="display:none;">
             </div>
         </div>
 

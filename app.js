@@ -92,8 +92,73 @@ function addEducation() {
     container.appendChild(entry);
 }
 
+function addVolunteer() {
+    const container = document.getElementById('volunteer-container');
+    const entry = document.createElement('div');
+    entry.className = 'volunteer-entry';
+    entry.innerHTML = `
+        <div class="form-group">
+            <label>Organization</label>
+            <input type="text" class="volunteer-org" placeholder="Organization Name" spellcheck="true">
+        </div>
+        <div class="form-group">
+            <label>Role</label>
+            <input type="text" class="volunteer-role" placeholder="Volunteer Role or Title" spellcheck="true">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Start Date</label>
+                <input type="text" class="volunteer-start" placeholder="Month Year">
+            </div>
+            <div class="form-group">
+                <label>End Date</label>
+                <input type="text" class="volunteer-end" placeholder="Present">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <div class="responsibilities-container">
+                <div class="bullet-entry">
+                    <span class="bullet-icon">•</span>
+                    <input type="text" class="bullet-input" placeholder="Describe your involvement..." spellcheck="true">
+                    <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+                </div>
+            </div>
+            <button class="add-bullet-btn" onclick="addBullet(this)">+ Add Bullet Point</button>
+        </div>
+        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Entry</button>
+    `;
+    container.appendChild(entry);
+}
+
+function addTraining() {
+    const container = document.getElementById('training-container');
+    const entry = document.createElement('div');
+    entry.className = 'training-entry';
+    entry.innerHTML = `
+        <div class="form-group">
+            <label>School / Training Provider</label>
+            <input type="text" class="training-school" placeholder="ATP Flight School, FlightSafety International..." spellcheck="true">
+        </div>
+        <div class="form-group">
+            <label>Program / Course</label>
+            <input type="text" class="training-program" placeholder="Multi-Engine Rating, Part 141 Private Pilot..." spellcheck="true">
+        </div>
+        <div class="form-group">
+            <label>Date</label>
+            <input type="text" class="training-date" placeholder="Month Year">
+        </div>
+        <div class="form-group">
+            <label>Additional Details (one per line)</label>
+            <textarea class="training-details" rows="2" placeholder="Aircraft types, honors, achievements..." spellcheck="true"></textarea>
+        </div>
+        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Training</button>
+    `;
+    container.appendChild(entry);
+}
+
 function removeEntry(button) {
-    const entry = button.closest('.certificate-entry, .hours-entry, .experience-entry, .education-entry');
+    const entry = button.closest('.certificate-entry, .hours-entry, .experience-entry, .education-entry, .volunteer-entry, .training-entry');
     if (entry) {
         entry.remove();
     }
@@ -246,6 +311,59 @@ function generateResume() {
         `;
     }
 
+    // Aviation Training section
+    if (data.training.length > 0) {
+        html += `
+            <div class="resume-section">
+                <div class="resume-section-title">Aviation Training & Education</div>
+                ${data.training.map(t => `
+                    <div class="edu-entry">
+                        <div class="edu-header">
+                            <span class="institution-display">${escapeHtml(t.school)}</span>
+                            <span class="edu-dates">${escapeHtml(t.date)}</span>
+                        </div>
+                        <div class="degree-display">${escapeHtml(t.program)}</div>
+                        ${t.details.length > 0 ? `
+                            <ul class="edu-details-list">
+                                ${t.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // Volunteer Experience & Community Involvement section
+    if (data.volunteer.length > 0) {
+        html += `
+            <div class="resume-section">
+                <div class="resume-section-title">Volunteer Experience & Community Involvement</div>
+                ${data.volunteer.map(v => `
+                    <div class="job-entry">
+                        <div class="job-header">
+                            <span class="company-name-display">${escapeHtml(v.organization)}</span>
+                            <span class="job-dates">${escapeHtml(v.startDate)}${v.endDate ? ' - ' + escapeHtml(v.endDate) : ''}</span>
+                        </div>
+                        <div class="job-title-display">${escapeHtml(v.role)}</div>
+                        ${v.bullets.length > 0 ? `
+                            <ul class="responsibilities-list">
+                                ${v.bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // References
+    html += `
+        <div class="resume-section" style="text-align: center; margin-top: 15px; font-size: 11px; font-style: italic;">
+            References available upon request
+        </div>
+    `;
+
     html += '</div>';
     preview.innerHTML = html;
 }
@@ -301,7 +419,29 @@ function gatherFormData() {
                     .map(d => d.trim())
                     .filter(d => d)
             }))
-            .filter(edu => edu.institution || edu.degree)
+            .filter(edu => edu.institution || edu.degree),
+        training: Array.from(document.querySelectorAll('.training-entry'))
+            .map(entry => ({
+                school: entry.querySelector('.training-school').value.trim(),
+                program: entry.querySelector('.training-program').value.trim(),
+                date: entry.querySelector('.training-date').value.trim(),
+                details: entry.querySelector('.training-details').value
+                    .split('\n')
+                    .map(d => d.trim())
+                    .filter(d => d)
+            }))
+            .filter(t => t.school || t.program),
+        volunteer: Array.from(document.querySelectorAll('.volunteer-entry'))
+            .map(entry => ({
+                organization: entry.querySelector('.volunteer-org').value.trim(),
+                role: entry.querySelector('.volunteer-role').value.trim(),
+                startDate: entry.querySelector('.volunteer-start').value.trim(),
+                endDate: entry.querySelector('.volunteer-end').value.trim(),
+                bullets: Array.from(entry.querySelectorAll('.bullet-input'))
+                    .map(input => input.value.trim())
+                    .filter(r => r)
+            }))
+            .filter(v => v.organization || v.role)
     };
 }
 
@@ -542,6 +682,104 @@ function exportPDF() {
                 y += 5;
             });
         }
+
+        // --- AVIATION TRAINING ---
+        if (data.training.length > 0) {
+            checkPage(30);
+            doc.setFont('times', 'bold');
+            doc.setFontSize(12);
+            doc.text('Aviation Training & Education', margin, y);
+            y += 3;
+            doc.setLineWidth(0.75);
+            doc.line(margin, y, pageW - margin, y);
+            y += 12;
+
+            data.training.forEach(t => {
+                checkPage(30);
+
+                doc.setFont('times', 'bold');
+                doc.setFontSize(10);
+                doc.text(t.school, margin, y);
+                doc.setFont('times', 'normal');
+                doc.text(t.date, pageW - margin, y, { align: 'right' });
+                y += 13;
+
+                doc.setFont('times', 'italic');
+                doc.setFontSize(10);
+                doc.text(t.program, margin, y);
+                y += 12;
+
+                if (t.details.length > 0) {
+                    doc.setFont('times', 'normal');
+                    doc.setFontSize(9);
+                    t.details.forEach(d => {
+                        checkPage(12);
+                        var lines = getWrappedLines(d, contentW - 20);
+                        lines.forEach(function(line, i) {
+                            if (i === 0) {
+                                doc.text('\u2022  ' + line, margin + 10, y);
+                            } else {
+                                doc.text('   ' + line, margin + 10, y);
+                            }
+                            y += 11;
+                        });
+                    });
+                }
+                y += 5;
+            });
+        }
+
+        // --- VOLUNTEER EXPERIENCE ---
+        if (data.volunteer.length > 0) {
+            checkPage(30);
+            doc.setFont('times', 'bold');
+            doc.setFontSize(12);
+            doc.text('Volunteer Experience & Community Involvement', margin, y);
+            y += 3;
+            doc.setLineWidth(0.75);
+            doc.line(margin, y, pageW - margin, y);
+            y += 12;
+
+            data.volunteer.forEach(v => {
+                checkPage(40);
+
+                doc.setFont('times', 'bold');
+                doc.setFontSize(10);
+                doc.text(v.organization, margin, y);
+                var dateStr = v.startDate + (v.endDate ? ' - ' + v.endDate : '');
+                doc.setFont('times', 'normal');
+                doc.text(dateStr, pageW - margin, y, { align: 'right' });
+                y += 13;
+
+                doc.setFont('times', 'italic');
+                doc.setFontSize(10);
+                doc.text(v.role, margin, y);
+                y += 12;
+
+                doc.setFont('times', 'normal');
+                doc.setFontSize(9);
+                v.bullets.forEach(b => {
+                    checkPage(12);
+                    var lines = getWrappedLines(b, contentW - 20);
+                    lines.forEach(function(line, i) {
+                        if (i === 0) {
+                            doc.text('\u2022  ' + line, margin + 10, y);
+                        } else {
+                            doc.text('   ' + line, margin + 10, y);
+                        }
+                        y += 11;
+                    });
+                });
+                y += 5;
+            });
+        }
+
+        // --- REFERENCES ---
+        checkPage(25);
+        y += 5;
+        doc.setFont('times', 'italic');
+        doc.setFontSize(10);
+        doc.text('References available upon request', pageW / 2, y, { align: 'center' });
 
         // Generate filename from the person's name
         const filename = data.fullName.replace(/\s+/g, '_') + '_Resume.pdf';
@@ -894,6 +1132,9 @@ document.addEventListener('DOMContentLoaded', function() {
             formatPhoneNumber(this);
         });
     }
+
+    // Auto-load saved data from localStorage
+    loadSavedData();
 });
 
 function formatPhoneNumber(input) {
@@ -1415,6 +1656,93 @@ function populateForm(data) {
         });
     }
 
+    // Aviation Training
+    if (data.training && data.training.length > 0) {
+        const trainContainer = document.getElementById('training-container');
+        trainContainer.innerHTML = '';
+
+        data.training.forEach(t => {
+            const entry = document.createElement('div');
+            entry.className = 'training-entry';
+            entry.innerHTML = `
+                <div class="form-group">
+                    <label>School / Training Provider</label>
+                    <input type="text" class="training-school" value="${escapeHtmlAttr(t.school)}" spellcheck="true">
+                </div>
+                <div class="form-group">
+                    <label>Program / Course</label>
+                    <input type="text" class="training-program" value="${escapeHtmlAttr(t.program)}" spellcheck="true">
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="text" class="training-date" value="${escapeHtmlAttr(t.date)}">
+                </div>
+                <div class="form-group">
+                    <label>Additional Details (one per line)</label>
+                    <textarea class="training-details" rows="2" spellcheck="true">${escapeHtmlAttr(t.details.join('\n'))}</textarea>
+                </div>
+                <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Training</button>
+            `;
+            trainContainer.appendChild(entry);
+        });
+    }
+
+    // Volunteer Experience
+    if (data.volunteer && data.volunteer.length > 0) {
+        const volContainer = document.getElementById('volunteer-container');
+        volContainer.innerHTML = '';
+
+        data.volunteer.forEach(v => {
+            const bulletsHtml = v.bullets && v.bullets.length > 0
+                ? v.bullets.map(b => `
+                    <div class="bullet-entry">
+                        <span class="bullet-icon">•</span>
+                        <input type="text" class="bullet-input" value="${escapeHtmlAttr(b)}" spellcheck="true">
+                        <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+                    </div>
+                `).join('')
+                : `
+                    <div class="bullet-entry">
+                        <span class="bullet-icon">•</span>
+                        <input type="text" class="bullet-input" placeholder="Describe your involvement..." spellcheck="true">
+                        <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
+                    </div>
+                `;
+
+            const entry = document.createElement('div');
+            entry.className = 'volunteer-entry';
+            entry.innerHTML = `
+                <div class="form-group">
+                    <label>Organization</label>
+                    <input type="text" class="volunteer-org" value="${escapeHtmlAttr(v.organization)}" spellcheck="true">
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <input type="text" class="volunteer-role" value="${escapeHtmlAttr(v.role)}" spellcheck="true">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="text" class="volunteer-start" value="${escapeHtmlAttr(v.startDate)}">
+                    </div>
+                    <div class="form-group">
+                        <label>End Date</label>
+                        <input type="text" class="volunteer-end" value="${escapeHtmlAttr(v.endDate)}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <div class="responsibilities-container">
+                        ${bulletsHtml}
+                    </div>
+                    <button class="add-bullet-btn" onclick="addBullet(this)">+ Add Bullet Point</button>
+                </div>
+                <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Entry</button>
+            `;
+            volContainer.appendChild(entry);
+        });
+    }
+
     // Auto-generate preview after import
     generateResume();
 }
@@ -1431,4 +1759,56 @@ function escapeHtmlAttr(text) {
         .replace(/'/g, '&#39;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
+}
+
+// ==========================================
+// SAVE / LOAD FORM DATA
+// ==========================================
+
+function saveFormData() {
+    var data = gatherFormData();
+    localStorage.setItem('resumeData', JSON.stringify(data));
+    alert('Progress saved! Your data will be here when you come back.');
+}
+
+function loadSavedData() {
+    var saved = localStorage.getItem('resumeData');
+    if (saved) {
+        try {
+            var data = JSON.parse(saved);
+            populateForm(data);
+        } catch (e) {
+            console.error('Failed to load saved data:', e);
+        }
+    }
+}
+
+function exportFormJSON() {
+    var data = gatherFormData();
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (data.fullName || 'resume').replace(/\s+/g, '_') + '_data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importFormJSON(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var data = JSON.parse(e.target.result);
+            populateForm(data);
+            alert('Resume data loaded successfully!');
+        } catch (err) {
+            alert('Error reading file: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    // Reset the input so the same file can be re-imported
+    event.target.value = '';
 }
