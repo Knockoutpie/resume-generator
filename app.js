@@ -562,23 +562,8 @@ function exportPDF() {
                 doc.setFontSize(9);
                 data.hours.forEach(h => {
                     checkPage(12);
-                    const labelW = doc.getTextWidth(h.label);
-                    const valueW = doc.getTextWidth(h.value);
-                    doc.text(h.label, hoursX, y);
-                    doc.text(h.value, hoursX + colW, y, { align: 'right' });
-
-                    // Dot leader between label and value
-                    const dotsStart = hoursX + labelW + 5;
-                    const dotsEnd = hoursX + colW - valueW - 5;
-                    if (dotsEnd > dotsStart) {
-                        let dotX = dotsStart;
-                        doc.setFontSize(7);
-                        while (dotX < dotsEnd) {
-                            doc.text('.', dotX, y);
-                            dotX += 3;
-                        }
-                        doc.setFontSize(9);
-                    }
+                    // Clean format: "Label: Value" for ATS readability
+                    doc.text(h.label + ':  ' + h.value, hoursX, y);
                     y += 11;
                 });
             }
