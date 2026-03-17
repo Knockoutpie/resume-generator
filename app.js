@@ -1350,7 +1350,10 @@ function parseResumeText(text) {
         certificates: [],
         skills: [],
         experience: [],
-        education: []
+        education: [],
+        training: [],
+        volunteer: [],
+        references: []
     };
 
     // Normalize text - preserve line breaks for structure, only collapse horizontal whitespace
@@ -1403,8 +1406,8 @@ function parseResumeText(text) {
     // Identify sections based on common headers
     const sectionPatterns = {
         experience: /work\s*experience|professional\s*experience|employment|experience/i,
-        education: /education|academic/i,
-        skills: /skills|technical\s*skills|competencies|expertise/i,
+        education: /\beducation\b(?!\s*skills)|academic/i,
+        skills: /\bskills\b|technical\s*skills|competencies|expertise/i,
         certificates: /certificates?|certifications?|licenses?|ratings?/i,
         projects: /projects?|professional\s*projects/i,
         objective: /objective|summary|profile|professional\s*objective/i
@@ -1468,58 +1471,69 @@ function identifySections(text, patterns) {
 
 function parseExperienceSection(text) {
     const experiences = [];
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
 
-    // Pattern to find job entries: Company, Title, Date range
-    const datePattern = /(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\s*[-–—to]+\s*(?:Present|Current|January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{0,4}/gi;
+    // Date pattern that matches lines like "MARCH 2022 TO PRESENT" or "AUGUST 2015 – MARCH 2016"
+    const dateLinePattern = /^((?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4})\s*(?:[-–—]|to)\s*((?:Present|Current|January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{0,4})\s*$/i;
 
-    const dates = [...text.matchAll(datePattern)];
+    let currentJob = null;
 
-    if (dates.length > 0) {
-        dates.forEach((dateMatch, index) => {
-            const dateStr = dateMatch[0];
-            const dateIndex = dateMatch.index;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const dateMatch = line.match(dateLinePattern);
 
-            // Find content before this date (company/title)
-            const prevDateEnd = index > 0 ? dates[index - 1].index + dates[index - 1][0].length : 0;
-            const headerText = text.substring(prevDateEnd, dateIndex).trim();
-
-            // Find content after this date until next date or section
-            const nextDateStart = index < dates.length - 1 ? dates[index + 1].index : text.length;
-            const contentText = text.substring(dateIndex + dateStr.length, nextDateStart).trim();
-
-            // Parse the date range
-            const dateParts = dateStr.split(/[-–—]|to/i).map(d => d.trim());
-            const startDate = dateParts[0] || '';
-            const endDate = dateParts[1] || 'Present';
-
-            // Try to extract company and title from header
-            const headerLines = headerText.split(/[,\n]/).map(l => l.trim()).filter(l => l);
-            let company = '';
-            let title = '';
-
-            if (headerLines.length >= 2) {
-                company = headerLines[headerLines.length - 2] || '';
-                title = headerLines[headerLines.length - 1] || '';
-            } else if (headerLines.length === 1) {
-                company = headerLines[0];
+        if (dateMatch) {
+            // Save previous job if exists
+            if (currentJob && (currentJob.company || currentJob.title)) {
+                experiences.push(currentJob);
             }
 
-            // Extract bullet points from content
-            const bullets = contentText
-                .split(/[•●○■◦▪-]\s*|\d+\.\s*/)
-                .map(b => b.trim())
-                .filter(b => b.length > 10 && !b.match(/^[A-Z]{2,},?\s*[A-Z]{2}/)); // Filter out locations
+            currentJob = {
+                company: '',
+                title: '',
+                startDate: dateMatch[1].trim(),
+                endDate: dateMatch[2].trim(),
+                responsibilities: []
+            };
 
-            if (company || title || bullets.length > 0) {
-                experiences.push({
-                    company: company.replace(/[,.]$/, ''),
-                    title: title.replace(/[,.]$/, ''),
-                    startDate: startDate,
-                    endDate: endDate,
-                    responsibilities: bullets.slice(0, 10) // Limit to 10 bullets
-                });
+            // Next line(s) after date are typically title then company
+            // Title is usually ALL CAPS or bold
+            if (i + 1 < lines.length && !lines[i + 1].match(dateLinePattern)) {
+                const nextLine = lines[i + 1];
+                // Check if it looks like a title (ALL CAPS, no bullet)
+                if (!nextLine.match(/^[•●○■◦▪-]\s/) && nextLine.length < 80) {
+                    currentJob.title = nextLine.replace(/[,.]$/, '');
+                    i++;
+
+                    // Line after title is typically company
+                    if (i + 1 < lines.length && !lines[i + 1].match(dateLinePattern) && !lines[i + 1].match(/^[•●○■◦▪-]\s/)) {
+                        const companyLine = lines[i + 1];
+                        if (companyLine.length < 80) {
+                            currentJob.company = companyLine.replace(/[,.]$/, '');
+                            i++;
+                        }
+                    }
+                }
             }
-        });
+        } else if (currentJob) {
+            // Check if it's a bullet point
+            const bulletMatch = line.match(/^[•●○■◦▪-]\s*(.*)/);
+            if (bulletMatch) {
+                const bulletText = bulletMatch[1].trim();
+                if (bulletText.length > 5) {
+                    currentJob.responsibilities.push(bulletText);
+                }
+            } else if (line.length > 20 && currentJob.responsibilities.length > 0) {
+                // Continuation of previous bullet (wrapped line)
+                const lastIdx = currentJob.responsibilities.length - 1;
+                currentJob.responsibilities[lastIdx] += ' ' + line;
+            }
+        }
+    }
+
+    // Don't forget the last job
+    if (currentJob && (currentJob.company || currentJob.title)) {
+        experiences.push(currentJob);
     }
 
     return experiences;
