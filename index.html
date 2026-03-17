@@ -230,6 +230,40 @@
                 <button class="add-btn" onclick="addVolunteer()">+ Add Volunteer Experience</button>
             </section>
 
+            <!-- References -->
+            <section class="form-section">
+                <h2>References</h2>
+                <p class="import-description">Leave blank to display "References available upon request"</p>
+                <div id="references-container">
+                    <div class="reference-entry">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" class="ref-name" placeholder="Reference Full Name" spellcheck="true">
+                        </div>
+                        <div class="form-group">
+                            <label>Title / Relationship</label>
+                            <input type="text" class="ref-title" placeholder="Chief Pilot, Former Supervisor..." spellcheck="true">
+                        </div>
+                        <div class="form-group">
+                            <label>Company / Organization</label>
+                            <input type="text" class="ref-company" placeholder="Company Name" spellcheck="true">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input type="tel" class="ref-phone" placeholder="(555) 555-5555">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" class="ref-email" placeholder="reference@email.com">
+                            </div>
+                        </div>
+                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Reference</button>
+                    </div>
+                </div>
+                <button class="add-btn" onclick="addReference()">+ Add Reference</button>
+            </section>
+
             <div class="action-buttons">
                 <button class="generate-btn" onclick="generateResume()">Generate Resume</button>
                 <button class="export-btn" onclick="exportPDF()">Export to PDF</button>

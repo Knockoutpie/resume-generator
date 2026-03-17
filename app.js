@@ -157,8 +157,40 @@ function addTraining() {
     container.appendChild(entry);
 }
 
+function addReference() {
+    const container = document.getElementById('references-container');
+    const entry = document.createElement('div');
+    entry.className = 'reference-entry';
+    entry.innerHTML = `
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" class="ref-name" placeholder="Reference Full Name" spellcheck="true">
+        </div>
+        <div class="form-group">
+            <label>Title / Relationship</label>
+            <input type="text" class="ref-title" placeholder="Chief Pilot, Former Supervisor..." spellcheck="true">
+        </div>
+        <div class="form-group">
+            <label>Company / Organization</label>
+            <input type="text" class="ref-company" placeholder="Company Name" spellcheck="true">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="tel" class="ref-phone" placeholder="(555) 555-5555">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" class="ref-email" placeholder="reference@email.com">
+            </div>
+        </div>
+        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Reference</button>
+    `;
+    container.appendChild(entry);
+}
+
 function removeEntry(button) {
-    const entry = button.closest('.certificate-entry, .hours-entry, .experience-entry, .education-entry, .volunteer-entry, .training-entry');
+    const entry = button.closest('.certificate-entry, .hours-entry, .experience-entry, .education-entry, .volunteer-entry, .training-entry, .reference-entry');
     if (entry) {
         entry.remove();
     }
@@ -358,11 +390,29 @@ function generateResume() {
     }
 
     // References
-    html += `
-        <div class="resume-section" style="text-align: center; margin-top: 15px; font-size: 11px; font-style: italic;">
-            References available upon request
-        </div>
-    `;
+    if (data.references && data.references.length > 0) {
+        html += `
+            <div class="resume-section">
+                <div class="resume-section-title">References</div>
+                ${data.references.map(r => `
+                    <div class="job-entry">
+                        <strong>${escapeHtml(r.name)}</strong>
+                        ${r.title ? ` — ${escapeHtml(r.title)}` : ''}
+                        ${r.company ? `, ${escapeHtml(r.company)}` : ''}<br>
+                        ${r.phone ? `Phone: ${escapeHtml(r.phone)}` : ''}
+                        ${r.phone && r.email ? ' | ' : ''}
+                        ${r.email ? `Email: ${escapeHtml(r.email)}` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="resume-section" style="text-align: center; margin-top: 15px; font-size: 11px; font-style: italic;">
+                References available upon request
+            </div>
+        `;
+    }
 
     html += '</div>';
     preview.innerHTML = html;
@@ -441,7 +491,16 @@ function gatherFormData() {
                     .map(input => input.value.trim())
                     .filter(r => r)
             }))
-            .filter(v => v.organization || v.role)
+            .filter(v => v.organization || v.role),
+        references: Array.from(document.querySelectorAll('.reference-entry'))
+            .map(entry => ({
+                name: entry.querySelector('.ref-name').value.trim(),
+                title: entry.querySelector('.ref-title').value.trim(),
+                company: entry.querySelector('.ref-company').value.trim(),
+                phone: entry.querySelector('.ref-phone').value.trim(),
+                email: entry.querySelector('.ref-email').value.trim()
+            }))
+            .filter(r => r.name)
     };
 }
 
@@ -760,11 +819,44 @@ function exportPDF() {
         }
 
         // --- REFERENCES ---
-        checkPage(25);
-        y += 5;
-        doc.setFont('times', 'italic');
-        doc.setFontSize(10);
-        doc.text('References available upon request', pageW / 2, y, { align: 'center' });
+        if (data.references && data.references.length > 0) {
+            checkPage(30 + data.references.length * 30);
+            y += 5;
+            doc.setFont('times', 'bold');
+            doc.setFontSize(11);
+            doc.text('References', margin, y);
+            y += 2;
+            doc.setLineWidth(0.5);
+            doc.line(margin, y, pageW - margin, y);
+            y += 12;
+
+            data.references.forEach(r => {
+                checkPage(35);
+                doc.setFont('times', 'bold');
+                doc.setFontSize(10);
+                let refLine = r.name;
+                if (r.title) refLine += ' — ' + r.title;
+                if (r.company) refLine += ', ' + r.company;
+                doc.text(refLine, margin, y);
+                y += 12;
+
+                doc.setFont('times', 'normal');
+                let contactParts = [];
+                if (r.phone) contactParts.push('Phone: ' + r.phone);
+                if (r.email) contactParts.push('Email: ' + r.email);
+                if (contactParts.length > 0) {
+                    doc.text(contactParts.join('  |  '), margin, y);
+                    y += 12;
+                }
+                y += 3;
+            });
+        } else {
+            checkPage(25);
+            y += 5;
+            doc.setFont('times', 'italic');
+            doc.setFontSize(10);
+            doc.text('References available upon request', pageW / 2, y, { align: 'center' });
+        }
 
         // Generate filename from the person's name
         const filename = data.fullName.replace(/\s+/g, '_') + '_Resume.pdf';
@@ -1725,6 +1817,43 @@ function populateForm(data) {
                 <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Entry</button>
             `;
             volContainer.appendChild(entry);
+        });
+    }
+
+    // References
+    if (data.references && data.references.length > 0) {
+        const refContainer = document.getElementById('references-container');
+        refContainer.innerHTML = '';
+
+        data.references.forEach(r => {
+            const entry = document.createElement('div');
+            entry.className = 'reference-entry';
+            entry.innerHTML = `
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" class="ref-name" value="${escapeHtmlAttr(r.name)}" spellcheck="true">
+                </div>
+                <div class="form-group">
+                    <label>Title / Relationship</label>
+                    <input type="text" class="ref-title" value="${escapeHtmlAttr(r.title)}" spellcheck="true">
+                </div>
+                <div class="form-group">
+                    <label>Company / Organization</label>
+                    <input type="text" class="ref-company" value="${escapeHtmlAttr(r.company)}" spellcheck="true">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" class="ref-phone" value="${escapeHtmlAttr(r.phone)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" class="ref-email" value="${escapeHtmlAttr(r.email)}">
+                    </div>
+                </div>
+                <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Reference</button>
+            `;
+            refContainer.appendChild(entry);
         });
     }
 
