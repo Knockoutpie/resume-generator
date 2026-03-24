@@ -1,6 +1,189 @@
 // Resume Generator Application
 
 // ==========================================
+// SECTION ORDERING & CUSTOM TITLES
+// ==========================================
+
+const DEFAULT_SECTION_ORDER = ['certificates', 'hours', 'experience', 'education', 'training', 'volunteer', 'references'];
+
+const DEFAULT_SECTION_TITLES = {
+    certificates: 'Certificates and Ratings',
+    hours: 'Flight Hours',
+    experience: 'Work Experience',
+    education: 'Education',
+    training: 'Aviation Training & Education',
+    volunteer: 'Volunteer Experience & Community Involvement',
+    references: 'References'
+};
+
+function getSectionOrder() {
+    try {
+        const saved = localStorage.getItem('resumeSectionOrder');
+        if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [...DEFAULT_SECTION_ORDER];
+}
+
+function saveSectionOrder() {
+    const sections = document.querySelectorAll('.draggable-section');
+    const order = Array.from(sections).map(s => s.dataset.sectionId);
+    localStorage.setItem('resumeSectionOrder', JSON.stringify(order));
+    triggerAutoSave();
+}
+
+function getSectionTitles() {
+    try {
+        const saved = localStorage.getItem('resumeSectionTitles');
+        if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { ...DEFAULT_SECTION_TITLES };
+}
+
+function saveSectionTitles() {
+    const titles = {};
+    document.querySelectorAll('.draggable-section').forEach(section => {
+        const id = section.dataset.sectionId;
+        const titleEl = section.querySelector('.section-title');
+        if (titleEl) {
+            titles[id] = titleEl.textContent.trim();
+        }
+    });
+    localStorage.setItem('resumeSectionTitles', JSON.stringify(titles));
+    triggerAutoSave();
+}
+
+function getSectionTitle(sectionId) {
+    const titles = getSectionTitles();
+    return titles[sectionId] || DEFAULT_SECTION_TITLES[sectionId] || sectionId;
+}
+
+function applySavedOrder() {
+    const order = getSectionOrder();
+    const titles = getSectionTitles();
+    const formPanel = document.querySelector('.form-panel');
+    const actionButtons = formPanel.querySelector('.action-buttons');
+
+    order.forEach(sectionId => {
+        const section = formPanel.querySelector(`[data-section-id="${sectionId}"]`);
+        if (section) {
+            formPanel.insertBefore(section, actionButtons);
+            // Apply saved title
+            const titleEl = section.querySelector('.section-title');
+            if (titleEl && titles[sectionId]) {
+                titleEl.textContent = titles[sectionId];
+            }
+        }
+    });
+}
+
+function moveSectionUp(button) {
+    const section = button.closest('.draggable-section');
+    const prev = section.previousElementSibling;
+    if (prev && prev.classList.contains('draggable-section')) {
+        section.parentNode.insertBefore(section, prev);
+        saveSectionOrder();
+    }
+}
+
+function moveSectionDown(button) {
+    const section = button.closest('.draggable-section');
+    const next = section.nextElementSibling;
+    if (next && next.classList.contains('draggable-section')) {
+        section.parentNode.insertBefore(next, section);
+        saveSectionOrder();
+    }
+}
+
+// Drag and drop
+let draggedSection = null;
+
+function initDragAndDrop() {
+    document.querySelectorAll('.draggable-section').forEach(section => {
+        section.addEventListener('dragstart', function(e) {
+            draggedSection = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        section.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            draggedSection = null;
+            saveSectionOrder();
+        });
+
+        section.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (this !== draggedSection && this.classList.contains('draggable-section')) {
+                this.classList.add('drag-over');
+            }
+        });
+
+        section.addEventListener('dragleave', function() {
+            this.classList.remove('drag-over');
+        });
+
+        section.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            if (draggedSection && this !== draggedSection) {
+                const parent = this.parentNode;
+                const allSections = Array.from(parent.querySelectorAll('.draggable-section'));
+                const dragIdx = allSections.indexOf(draggedSection);
+                const dropIdx = allSections.indexOf(this);
+                if (dragIdx < dropIdx) {
+                    parent.insertBefore(draggedSection, this.nextSibling);
+                } else {
+                    parent.insertBefore(draggedSection, this);
+                }
+            }
+        });
+    });
+
+    // Save titles on blur
+    document.querySelectorAll('.section-title').forEach(title => {
+        title.addEventListener('blur', saveSectionTitles);
+        title.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.blur();
+            }
+        });
+    });
+}
+
+// ==========================================
+// AUTO-SAVE
+// ==========================================
+
+let autoSaveTimer = null;
+
+function triggerAutoSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(function() {
+        var data = gatherFormData();
+        localStorage.setItem('resumeData', JSON.stringify(data));
+
+        // Also save section order and titles
+        saveSectionOrder();
+
+        // Flash the indicator
+        var indicator = document.getElementById('autoSaveIndicator');
+        if (indicator) {
+            indicator.classList.add('visible');
+            setTimeout(function() { indicator.classList.remove('visible'); }, 2000);
+        }
+    }, 1500);
+}
+
+function initAutoSave() {
+    const formPanel = document.querySelector('.form-panel');
+    formPanel.addEventListener('input', triggerAutoSave);
+    formPanel.addEventListener('change', triggerAutoSave);
+}
+
+// ==========================================
 // FORM MANAGEMENT FUNCTIONS
 // ==========================================
 
@@ -269,150 +452,167 @@ function generateResume() {
             </div>
     `;
 
-    // Certificates and Hours section
-    if (data.certificates.length > 0 || data.hours.length > 0) {
-        html += `
-            <div class="resume-section">
-                <div class="certs-hours-container">
-                    <div class="certs-column">
-                        <h4>Certificates and Ratings</h4>
-                        <hr style="margin-bottom: 8px;">
-                        <ul class="cert-list">
-                            ${data.certificates.map(cert => `<li>${escapeHtml(cert)}</li>`).join('')}
-                        </ul>
-                    </div>
-                    <div class="hours-column">
-                        <h4>Hours</h4>
-                        <hr style="margin-bottom: 8px;">
-                        <div class="hours-list">
-                            ${data.hours.map(h => `
-                                <div class="hours-item">
-                                    <span class="hours-label-display">${escapeHtml(h.label)}</span>
-                                    <span class="hours-dots"></span>
-                                    <span class="hours-value-display">${escapeHtml(h.value)}</span>
+    // Render sections in user-defined order
+    const sectionOrder = getSectionOrder();
+
+    sectionOrder.forEach(sectionId => {
+        switch (sectionId) {
+            case 'certificates':
+            case 'hours':
+                // Only render certs+hours block once, when we hit whichever comes first
+                if (sectionId === 'certificates' || (sectionId === 'hours' && sectionOrder.indexOf('certificates') > sectionOrder.indexOf('hours'))) {
+                    if (data.certificates.length > 0 || data.hours.length > 0) {
+                        html += `
+                            <div class="resume-section">
+                                <div class="certs-hours-container">
+                                    <div class="certs-column">
+                                        <h4>${escapeHtml(getSectionTitle('certificates'))}</h4>
+                                        <hr style="margin-bottom: 8px;">
+                                        <ul class="cert-list">
+                                            ${data.certificates.map(cert => `<li>${escapeHtml(cert)}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                    <div class="hours-column">
+                                        <h4>${escapeHtml(getSectionTitle('hours'))}</h4>
+                                        <hr style="margin-bottom: 8px;">
+                                        <div class="hours-list">
+                                            ${data.hours.map(h => `
+                                                <div class="hours-item">
+                                                    <span class="hours-label-display">${escapeHtml(h.label)}</span>
+                                                    <span class="hours-dots"></span>
+                                                    <span class="hours-value-display">${escapeHtml(h.value)}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                break;
+
+            case 'experience':
+                if (data.experience.length > 0) {
+                    html += `
+                        <div class="resume-section">
+                            <div class="resume-section-title">${escapeHtml(getSectionTitle('experience'))}</div>
+                            ${data.experience.map(job => `
+                                <div class="job-entry">
+                                    <div class="job-header">
+                                        <span class="company-name-display">${escapeHtml(job.company)}</span>
+                                        <span class="job-dates">${escapeHtml(job.startDate)}${job.endDate ? ' - ' + escapeHtml(job.endDate) : ''}</span>
+                                    </div>
+                                    <div class="job-title-display">${escapeHtml(job.title)}</div>
+                                    <ul class="responsibilities-list">
+                                        ${job.responsibilities.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+                                    </ul>
                                 </div>
                             `).join('')}
                         </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+                    `;
+                }
+                break;
 
-    // Work Experience section
-    if (data.experience.length > 0) {
-        html += `
-            <div class="resume-section">
-                <div class="resume-section-title">Work Experience</div>
-                ${data.experience.map(job => `
-                    <div class="job-entry">
-                        <div class="job-header">
-                            <span class="company-name-display">${escapeHtml(job.company)}</span>
-                            <span class="job-dates">${escapeHtml(job.startDate)}${job.endDate ? ' - ' + escapeHtml(job.endDate) : ''}</span>
+            case 'education':
+                if (data.education.length > 0) {
+                    html += `
+                        <div class="resume-section">
+                            <div class="resume-section-title">${escapeHtml(getSectionTitle('education'))}</div>
+                            ${data.education.map(edu => `
+                                <div class="edu-entry">
+                                    <div class="edu-header">
+                                        <span class="institution-display">${escapeHtml(edu.institution)}</span>
+                                        <span class="edu-dates">${escapeHtml(edu.date)}</span>
+                                    </div>
+                                    <div class="degree-display">${escapeHtml(edu.degree)}</div>
+                                    ${edu.details.length > 0 ? `
+                                        <ul class="edu-details-list">
+                                            ${edu.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
+                                        </ul>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
                         </div>
-                        <div class="job-title-display">${escapeHtml(job.title)}</div>
-                        <ul class="responsibilities-list">
-                            ${job.responsibilities.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
-                        </ul>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
+                    `;
+                }
+                break;
 
-    // Education section
-    if (data.education.length > 0) {
-        html += `
-            <div class="resume-section">
-                <div class="resume-section-title">Education</div>
-                ${data.education.map(edu => `
-                    <div class="edu-entry">
-                        <div class="edu-header">
-                            <span class="institution-display">${escapeHtml(edu.institution)}</span>
-                            <span class="edu-dates">${escapeHtml(edu.date)}</span>
+            case 'training':
+                if (data.training.length > 0) {
+                    html += `
+                        <div class="resume-section">
+                            <div class="resume-section-title">${escapeHtml(getSectionTitle('training'))}</div>
+                            ${data.training.map(t => `
+                                <div class="edu-entry">
+                                    <div class="edu-header">
+                                        <span class="institution-display">${escapeHtml(t.school)}</span>
+                                        <span class="edu-dates">${escapeHtml(t.date)}</span>
+                                    </div>
+                                    <div class="degree-display">${escapeHtml(t.program)}</div>
+                                    ${t.details.length > 0 ? `
+                                        <ul class="edu-details-list">
+                                            ${t.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
+                                        </ul>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
                         </div>
-                        <div class="degree-display">${escapeHtml(edu.degree)}</div>
-                        ${edu.details.length > 0 ? `
-                            <ul class="edu-details-list">
-                                ${edu.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
-                            </ul>
-                        ` : ''}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
+                    `;
+                }
+                break;
 
-    // Aviation Training section
-    if (data.training.length > 0) {
-        html += `
-            <div class="resume-section">
-                <div class="resume-section-title">Aviation Training & Education</div>
-                ${data.training.map(t => `
-                    <div class="edu-entry">
-                        <div class="edu-header">
-                            <span class="institution-display">${escapeHtml(t.school)}</span>
-                            <span class="edu-dates">${escapeHtml(t.date)}</span>
+            case 'volunteer':
+                if (data.volunteer.length > 0) {
+                    html += `
+                        <div class="resume-section">
+                            <div class="resume-section-title">${escapeHtml(getSectionTitle('volunteer'))}</div>
+                            ${data.volunteer.map(v => `
+                                <div class="job-entry">
+                                    <div class="job-header">
+                                        <span class="company-name-display">${escapeHtml(v.organization)}</span>
+                                        <span class="job-dates">${escapeHtml(v.startDate)}${v.endDate ? ' - ' + escapeHtml(v.endDate) : ''}</span>
+                                    </div>
+                                    <div class="job-title-display">${escapeHtml(v.role)}</div>
+                                    ${v.bullets.length > 0 ? `
+                                        <ul class="responsibilities-list">
+                                            ${v.bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}
+                                        </ul>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
                         </div>
-                        <div class="degree-display">${escapeHtml(t.program)}</div>
-                        ${t.details.length > 0 ? `
-                            <ul class="edu-details-list">
-                                ${t.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
-                            </ul>
-                        ` : ''}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
+                    `;
+                }
+                break;
 
-    // Volunteer Experience & Community Involvement section
-    if (data.volunteer.length > 0) {
-        html += `
-            <div class="resume-section">
-                <div class="resume-section-title">Volunteer Experience & Community Involvement</div>
-                ${data.volunteer.map(v => `
-                    <div class="job-entry">
-                        <div class="job-header">
-                            <span class="company-name-display">${escapeHtml(v.organization)}</span>
-                            <span class="job-dates">${escapeHtml(v.startDate)}${v.endDate ? ' - ' + escapeHtml(v.endDate) : ''}</span>
+            case 'references':
+                if (data.references && data.references.length > 0) {
+                    html += `
+                        <div class="resume-section">
+                            <div class="resume-section-title">${escapeHtml(getSectionTitle('references'))}</div>
+                            ${data.references.map(r => `
+                                <div class="job-entry">
+                                    <strong>${escapeHtml(r.name)}</strong>
+                                    ${r.title ? ` — ${escapeHtml(r.title)}` : ''}
+                                    ${r.company ? `, ${escapeHtml(r.company)}` : ''}<br>
+                                    ${r.phone ? `Phone: ${escapeHtml(r.phone)}` : ''}
+                                    ${r.phone && r.email ? ' | ' : ''}
+                                    ${r.email ? `Email: ${escapeHtml(r.email)}` : ''}
+                                </div>
+                            `).join('')}
                         </div>
-                        <div class="job-title-display">${escapeHtml(v.role)}</div>
-                        ${v.bullets.length > 0 ? `
-                            <ul class="responsibilities-list">
-                                ${v.bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}
-                            </ul>
-                        ` : ''}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-
-    // References
-    if (data.references && data.references.length > 0) {
-        html += `
-            <div class="resume-section">
-                <div class="resume-section-title">References</div>
-                ${data.references.map(r => `
-                    <div class="job-entry">
-                        <strong>${escapeHtml(r.name)}</strong>
-                        ${r.title ? ` — ${escapeHtml(r.title)}` : ''}
-                        ${r.company ? `, ${escapeHtml(r.company)}` : ''}<br>
-                        ${r.phone ? `Phone: ${escapeHtml(r.phone)}` : ''}
-                        ${r.phone && r.email ? ' | ' : ''}
-                        ${r.email ? `Email: ${escapeHtml(r.email)}` : ''}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    } else {
-        html += `
-            <div class="resume-section" style="text-align: center; margin-top: 15px; font-size: 11px; font-style: italic;">
-                References available upon request
-            </div>
-        `;
-    }
+                    `;
+                } else {
+                    html += `
+                        <div class="resume-section" style="text-align: center; margin-top: 15px; font-size: 11px; font-style: italic;">
+                            References available upon request
+                        </div>
+                    `;
+                }
+                break;
+        }
+    });
 
     html += '</div>';
     preview.innerHTML = html;
@@ -532,6 +732,14 @@ function exportPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ unit: 'pt', format: 'letter' });
 
+        // PDF metadata for ATS/Workday compatibility
+        doc.setProperties({
+            title: data.fullName + ' - Resume',
+            subject: 'Resume',
+            author: data.fullName,
+            creator: 'Resume Generator'
+        });
+
         // Letter size: 612 x 792 points
         const pageW = 612;
         const pageH = 792;
@@ -571,292 +779,257 @@ function exportPDF() {
         }
         y += 18;
 
-        // --- CERTIFICATES & HOURS (side by side) ---
-        if (data.certificates.length > 0 || data.hours.length > 0) {
-            const colW = contentW / 2 - 10;
-            const startY = y;
+        // --- RENDER SECTIONS IN USER-DEFINED ORDER ---
+        const pdfSectionOrder = getSectionOrder();
+        let certsHoursRendered = false;
 
-            // Certificates column
-            if (data.certificates.length > 0) {
-                doc.setFont('times', 'bold');
-                doc.setFontSize(11);
-                doc.text('Certificates and Ratings', margin, y);
-                y += 3;
-                doc.setLineWidth(0.5);
-                doc.line(margin, y, margin + colW, y);
-                y += 10;
-
-                doc.setFont('times', 'normal');
-                doc.setFontSize(9);
-                data.certificates.forEach(cert => {
-                    checkPage(12);
-                    const lines = getWrappedLines(cert, colW - 15);
-                    lines.forEach((line, i) => {
-                        if (i === 0) {
-                            doc.text('\u2022  ' + line, margin + 5, y);
-                        } else {
-                            doc.text('   ' + line, margin + 5, y);
-                        }
-                        y += 11;
-                    });
-                });
-            }
-
-            const certsEndY = y;
-
-            // Hours column
-            if (data.hours.length > 0) {
-                y = startY;
-                const hoursX = margin + colW + 20;
-
-                doc.setFont('times', 'bold');
-                doc.setFontSize(11);
-                doc.text('Hours', hoursX, y);
-                y += 3;
-                doc.setLineWidth(0.5);
-                doc.line(hoursX, y, hoursX + colW, y);
-                y += 10;
-
-                doc.setFont('times', 'normal');
-                doc.setFontSize(9);
-                data.hours.forEach(h => {
-                    checkPage(12);
-                    // Clean format: "Label: Value" for ATS readability
-                    doc.text(h.label + ':  ' + h.value, hoursX, y);
-                    y += 11;
-                });
-            }
-
-            y = Math.max(y, certsEndY) + 8;
-        }
-
-        // --- WORK EXPERIENCE ---
-        if (data.experience.length > 0) {
+        // Helper: render a section header
+        function renderSectionHeader(title) {
             checkPage(30);
             doc.setFont('times', 'bold');
             doc.setFontSize(12);
-            doc.text('Work Experience', margin, y);
+            doc.text(title, margin, y);
             y += 3;
             doc.setLineWidth(0.75);
             doc.line(margin, y, pageW - margin, y);
             y += 12;
-
-            data.experience.forEach(job => {
-                checkPage(40);
-
-                // Company and dates on same line
-                doc.setFont('times', 'bold');
-                doc.setFontSize(10);
-                doc.text(job.company, margin, y);
-                const dateStr = job.startDate + (job.endDate ? ' - ' + job.endDate : '');
-                doc.setFont('times', 'normal');
-                doc.text(dateStr, pageW - margin, y, { align: 'right' });
-                y += 13;
-
-                // Job title
-                doc.setFont('times', 'italic');
-                doc.setFontSize(10);
-                doc.text(job.title, margin, y);
-                y += 12;
-
-                // Bullet points
-                doc.setFont('times', 'normal');
-                doc.setFontSize(9);
-                job.responsibilities.forEach(r => {
-                    checkPage(12);
-                    const lines = getWrappedLines(r, contentW - 20);
-                    lines.forEach((line, i) => {
-                        if (i === 0) {
-                            doc.text('\u2022  ' + line, margin + 10, y);
-                        } else {
-                            doc.text('   ' + line, margin + 10, y);
-                        }
-                        y += 11;
-                    });
-                });
-                y += 5;
-            });
         }
 
-        // --- EDUCATION ---
-        if (data.education.length > 0) {
-            checkPage(30);
-            doc.setFont('times', 'bold');
-            doc.setFontSize(12);
-            doc.text('Education', margin, y);
-            y += 3;
-            doc.setLineWidth(0.75);
-            doc.line(margin, y, pageW - margin, y);
-            y += 12;
+        pdfSectionOrder.forEach(function(sectionId) {
+            switch (sectionId) {
+                case 'certificates':
+                case 'hours':
+                    if (certsHoursRendered) break;
+                    certsHoursRendered = true;
 
-            data.education.forEach(edu => {
-                checkPage(30);
+                    if (data.certificates.length > 0 || data.hours.length > 0) {
+                        const colW = contentW / 2 - 10;
+                        const startY = y;
 
-                // Institution and date
-                doc.setFont('times', 'bold');
-                doc.setFontSize(10);
-                doc.text(edu.institution, margin, y);
-                doc.setFont('times', 'normal');
-                doc.text(edu.date, pageW - margin, y, { align: 'right' });
-                y += 13;
+                        if (data.certificates.length > 0) {
+                            doc.setFont('times', 'bold');
+                            doc.setFontSize(11);
+                            doc.text(getSectionTitle('certificates'), margin, y);
+                            y += 3;
+                            doc.setLineWidth(0.5);
+                            doc.line(margin, y, margin + colW, y);
+                            y += 10;
 
-                // Degree
-                doc.setFont('times', 'italic');
-                doc.setFontSize(10);
-                doc.text(edu.degree, margin, y);
-                y += 12;
+                            doc.setFont('times', 'normal');
+                            doc.setFontSize(9);
+                            data.certificates.forEach(function(cert) {
+                                checkPage(12);
+                                var lines = getWrappedLines(cert, colW - 15);
+                                lines.forEach(function(line, i) {
+                                    doc.text((i === 0 ? '\u2022  ' : '   ') + line, margin + 5, y);
+                                    y += 11;
+                                });
+                            });
+                        }
 
-                // Details
-                if (edu.details.length > 0) {
-                    doc.setFont('times', 'normal');
-                    doc.setFontSize(9);
-                    edu.details.forEach(d => {
-                        checkPage(12);
-                        const lines = getWrappedLines(d, contentW - 20);
-                        lines.forEach((line, i) => {
-                            if (i === 0) {
-                                doc.text('\u2022  ' + line, margin + 10, y);
-                            } else {
-                                doc.text('   ' + line, margin + 10, y);
-                            }
-                            y += 11;
+                        var certsEndY = y;
+
+                        if (data.hours.length > 0) {
+                            y = startY;
+                            var hoursX = margin + colW + 20;
+
+                            doc.setFont('times', 'bold');
+                            doc.setFontSize(11);
+                            doc.text(getSectionTitle('hours'), hoursX, y);
+                            y += 3;
+                            doc.setLineWidth(0.5);
+                            doc.line(hoursX, y, hoursX + colW, y);
+                            y += 10;
+
+                            doc.setFont('times', 'normal');
+                            doc.setFontSize(9);
+                            data.hours.forEach(function(h) {
+                                checkPage(12);
+                                // Right-aligned value with dot leader for ATS readability
+                                var labelW = doc.getTextWidth(h.label);
+                                var valueStr = h.value;
+                                var valueW = doc.getTextWidth(valueStr);
+                                var dotsW = colW - labelW - valueW - 10;
+                                var dotCount = Math.max(0, Math.floor(dotsW / doc.getTextWidth('.')));
+                                var dots = '.'.repeat(dotCount);
+                                doc.text(h.label, hoursX, y);
+                                doc.text(dots, hoursX + labelW + 3, y);
+                                doc.text(valueStr, hoursX + colW, y, { align: 'right' });
+                                y += 11;
+                            });
+                        }
+
+                        y = Math.max(y, certsEndY) + 8;
+                    }
+                    break;
+
+                case 'experience':
+                    if (data.experience.length > 0) {
+                        renderSectionHeader(getSectionTitle('experience'));
+                        data.experience.forEach(function(job) {
+                            checkPage(40);
+                            doc.setFont('times', 'bold');
+                            doc.setFontSize(10);
+                            doc.text(job.company, margin, y);
+                            var dateStr = job.startDate + (job.endDate ? ' - ' + job.endDate : '');
+                            doc.setFont('times', 'normal');
+                            doc.text(dateStr, pageW - margin, y, { align: 'right' });
+                            y += 13;
+                            doc.setFont('times', 'italic');
+                            doc.setFontSize(10);
+                            doc.text(job.title, margin, y);
+                            y += 12;
+                            doc.setFont('times', 'normal');
+                            doc.setFontSize(9);
+                            job.responsibilities.forEach(function(r) {
+                                checkPage(12);
+                                var lines = getWrappedLines(r, contentW - 20);
+                                lines.forEach(function(line, i) {
+                                    doc.text((i === 0 ? '\u2022  ' : '   ') + line, margin + 10, y);
+                                    y += 11;
+                                });
+                            });
+                            y += 5;
                         });
-                    });
-                }
-                y += 5;
-            });
-        }
+                    }
+                    break;
 
-        // --- AVIATION TRAINING ---
-        if (data.training.length > 0) {
-            checkPage(30);
-            doc.setFont('times', 'bold');
-            doc.setFontSize(12);
-            doc.text('Aviation Training & Education', margin, y);
-            y += 3;
-            doc.setLineWidth(0.75);
-            doc.line(margin, y, pageW - margin, y);
-            y += 12;
-
-            data.training.forEach(t => {
-                checkPage(30);
-
-                doc.setFont('times', 'bold');
-                doc.setFontSize(10);
-                doc.text(t.school, margin, y);
-                doc.setFont('times', 'normal');
-                doc.text(t.date, pageW - margin, y, { align: 'right' });
-                y += 13;
-
-                doc.setFont('times', 'italic');
-                doc.setFontSize(10);
-                doc.text(t.program, margin, y);
-                y += 12;
-
-                if (t.details.length > 0) {
-                    doc.setFont('times', 'normal');
-                    doc.setFontSize(9);
-                    t.details.forEach(d => {
-                        checkPage(12);
-                        var lines = getWrappedLines(d, contentW - 20);
-                        lines.forEach(function(line, i) {
-                            if (i === 0) {
-                                doc.text('\u2022  ' + line, margin + 10, y);
-                            } else {
-                                doc.text('   ' + line, margin + 10, y);
+                case 'education':
+                    if (data.education.length > 0) {
+                        renderSectionHeader(getSectionTitle('education'));
+                        data.education.forEach(function(edu) {
+                            checkPage(30);
+                            doc.setFont('times', 'bold');
+                            doc.setFontSize(10);
+                            doc.text(edu.institution, margin, y);
+                            doc.setFont('times', 'normal');
+                            doc.text(edu.date, pageW - margin, y, { align: 'right' });
+                            y += 13;
+                            doc.setFont('times', 'italic');
+                            doc.setFontSize(10);
+                            doc.text(edu.degree, margin, y);
+                            y += 12;
+                            if (edu.details.length > 0) {
+                                doc.setFont('times', 'normal');
+                                doc.setFontSize(9);
+                                edu.details.forEach(function(d) {
+                                    checkPage(12);
+                                    var lines = getWrappedLines(d, contentW - 20);
+                                    lines.forEach(function(line, i) {
+                                        doc.text((i === 0 ? '\u2022  ' : '   ') + line, margin + 10, y);
+                                        y += 11;
+                                    });
+                                });
                             }
-                            y += 11;
+                            y += 5;
                         });
-                    });
-                }
-                y += 5;
-            });
-        }
+                    }
+                    break;
 
-        // --- VOLUNTEER EXPERIENCE ---
-        if (data.volunteer.length > 0) {
-            checkPage(30);
-            doc.setFont('times', 'bold');
-            doc.setFontSize(12);
-            doc.text('Volunteer Experience & Community Involvement', margin, y);
-            y += 3;
-            doc.setLineWidth(0.75);
-            doc.line(margin, y, pageW - margin, y);
-            y += 12;
+                case 'training':
+                    if (data.training.length > 0) {
+                        renderSectionHeader(getSectionTitle('training'));
+                        data.training.forEach(function(t) {
+                            checkPage(30);
+                            doc.setFont('times', 'bold');
+                            doc.setFontSize(10);
+                            doc.text(t.school, margin, y);
+                            doc.setFont('times', 'normal');
+                            doc.text(t.date, pageW - margin, y, { align: 'right' });
+                            y += 13;
+                            doc.setFont('times', 'italic');
+                            doc.setFontSize(10);
+                            doc.text(t.program, margin, y);
+                            y += 12;
+                            if (t.details.length > 0) {
+                                doc.setFont('times', 'normal');
+                                doc.setFontSize(9);
+                                t.details.forEach(function(d) {
+                                    checkPage(12);
+                                    var lines = getWrappedLines(d, contentW - 20);
+                                    lines.forEach(function(line, i) {
+                                        doc.text((i === 0 ? '\u2022  ' : '   ') + line, margin + 10, y);
+                                        y += 11;
+                                    });
+                                });
+                            }
+                            y += 5;
+                        });
+                    }
+                    break;
 
-            data.volunteer.forEach(v => {
-                checkPage(40);
+                case 'volunteer':
+                    if (data.volunteer.length > 0) {
+                        renderSectionHeader(getSectionTitle('volunteer'));
+                        data.volunteer.forEach(function(v) {
+                            checkPage(40);
+                            doc.setFont('times', 'bold');
+                            doc.setFontSize(10);
+                            doc.text(v.organization, margin, y);
+                            var dateStr = v.startDate + (v.endDate ? ' - ' + v.endDate : '');
+                            doc.setFont('times', 'normal');
+                            doc.text(dateStr, pageW - margin, y, { align: 'right' });
+                            y += 13;
+                            doc.setFont('times', 'italic');
+                            doc.setFontSize(10);
+                            doc.text(v.role, margin, y);
+                            y += 12;
+                            doc.setFont('times', 'normal');
+                            doc.setFontSize(9);
+                            v.bullets.forEach(function(b) {
+                                checkPage(12);
+                                var lines = getWrappedLines(b, contentW - 20);
+                                lines.forEach(function(line, i) {
+                                    doc.text((i === 0 ? '\u2022  ' : '   ') + line, margin + 10, y);
+                                    y += 11;
+                                });
+                            });
+                            y += 5;
+                        });
+                    }
+                    break;
 
-                doc.setFont('times', 'bold');
-                doc.setFontSize(10);
-                doc.text(v.organization, margin, y);
-                var dateStr = v.startDate + (v.endDate ? ' - ' + v.endDate : '');
-                doc.setFont('times', 'normal');
-                doc.text(dateStr, pageW - margin, y, { align: 'right' });
-                y += 13;
+                case 'references':
+                    if (data.references && data.references.length > 0) {
+                        checkPage(30 + data.references.length * 30);
+                        y += 5;
+                        doc.setFont('times', 'bold');
+                        doc.setFontSize(11);
+                        doc.text(getSectionTitle('references'), margin, y);
+                        y += 2;
+                        doc.setLineWidth(0.5);
+                        doc.line(margin, y, pageW - margin, y);
+                        y += 12;
 
-                doc.setFont('times', 'italic');
-                doc.setFontSize(10);
-                doc.text(v.role, margin, y);
-                y += 12;
-
-                doc.setFont('times', 'normal');
-                doc.setFontSize(9);
-                v.bullets.forEach(b => {
-                    checkPage(12);
-                    var lines = getWrappedLines(b, contentW - 20);
-                    lines.forEach(function(line, i) {
-                        if (i === 0) {
-                            doc.text('\u2022  ' + line, margin + 10, y);
-                        } else {
-                            doc.text('   ' + line, margin + 10, y);
-                        }
-                        y += 11;
-                    });
-                });
-                y += 5;
-            });
-        }
-
-        // --- REFERENCES ---
-        if (data.references && data.references.length > 0) {
-            checkPage(30 + data.references.length * 30);
-            y += 5;
-            doc.setFont('times', 'bold');
-            doc.setFontSize(11);
-            doc.text('References', margin, y);
-            y += 2;
-            doc.setLineWidth(0.5);
-            doc.line(margin, y, pageW - margin, y);
-            y += 12;
-
-            data.references.forEach(r => {
-                checkPage(35);
-                doc.setFont('times', 'bold');
-                doc.setFontSize(10);
-                let refLine = r.name;
-                if (r.title) refLine += ' — ' + r.title;
-                if (r.company) refLine += ', ' + r.company;
-                doc.text(refLine, margin, y);
-                y += 12;
-
-                doc.setFont('times', 'normal');
-                let contactParts = [];
-                if (r.phone) contactParts.push('Phone: ' + r.phone);
-                if (r.email) contactParts.push('Email: ' + r.email);
-                if (contactParts.length > 0) {
-                    doc.text(contactParts.join('  |  '), margin, y);
-                    y += 12;
-                }
-                y += 3;
-            });
-        } else {
-            checkPage(25);
-            y += 5;
-            doc.setFont('times', 'italic');
-            doc.setFontSize(10);
-            doc.text('References available upon request', pageW / 2, y, { align: 'center' });
-        }
+                        data.references.forEach(function(r) {
+                            checkPage(35);
+                            doc.setFont('times', 'bold');
+                            doc.setFontSize(10);
+                            var refLine = r.name;
+                            if (r.title) refLine += ' \u2014 ' + r.title;
+                            if (r.company) refLine += ', ' + r.company;
+                            doc.text(refLine, margin, y);
+                            y += 12;
+                            doc.setFont('times', 'normal');
+                            var refContact = [];
+                            if (r.phone) refContact.push('Phone: ' + r.phone);
+                            if (r.email) refContact.push('Email: ' + r.email);
+                            if (refContact.length > 0) {
+                                doc.text(refContact.join('  |  '), margin, y);
+                                y += 12;
+                            }
+                            y += 3;
+                        });
+                    } else {
+                        checkPage(25);
+                        y += 5;
+                        doc.setFont('times', 'italic');
+                        doc.setFontSize(10);
+                        doc.text('References available upon request', pageW / 2, y, { align: 'center' });
+                    }
+                    break;
+            }
+        });
 
         // Generate filename from the person's name
         const filename = data.fullName.replace(/\s+/g, '_') + '_Resume.pdf';
@@ -1896,6 +2069,8 @@ function escapeHtmlAttr(text) {
 function saveFormData() {
     var data = gatherFormData();
     localStorage.setItem('resumeData', JSON.stringify(data));
+    saveSectionOrder();
+    saveSectionTitles();
     alert('Progress saved! Your data will be here when you come back.');
 }
 
@@ -1911,17 +2086,6 @@ function loadSavedData() {
     }
 }
 
-function exportFormJSON() {
-    var data = gatherFormData();
-    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = (data.fullName || 'resume').replace(/\s+/g, '_') + '_data.json';
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
 function importFormJSON(event) {
     var file = event.target.files[0];
     if (!file) return;
@@ -1930,6 +2094,24 @@ function importFormJSON(event) {
     reader.onload = function(e) {
         try {
             var data = JSON.parse(e.target.result);
+            // If JSON includes section order/titles, apply them
+            if (data._sectionOrder) {
+                localStorage.setItem('resumeSectionOrder', JSON.stringify(data._sectionOrder));
+            }
+            if (data._sectionTitles) {
+                localStorage.setItem('resumeSectionTitles', JSON.stringify(data._sectionTitles));
+                var titles = data._sectionTitles;
+                document.querySelectorAll('.draggable-section').forEach(function(section) {
+                    var id = section.dataset.sectionId;
+                    var titleEl = section.querySelector('.section-title');
+                    if (titleEl && titles[id]) {
+                        titleEl.textContent = titles[id];
+                    }
+                });
+            }
+            if (data._sectionOrder) {
+                applySavedOrder();
+            }
             populateForm(data);
             alert('Resume data loaded successfully!');
         } catch (err) {
@@ -1940,3 +2122,28 @@ function importFormJSON(event) {
     // Reset the input so the same file can be re-imported
     event.target.value = '';
 }
+
+function exportFormJSON() {
+    var data = gatherFormData();
+    // Include section order and titles in export
+    data._sectionOrder = getSectionOrder();
+    data._sectionTitles = getSectionTitles();
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (data.fullName || 'resume').replace(/\s+/g, '_') + '_data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ==========================================
+// INITIALIZATION
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    applySavedOrder();
+    initDragAndDrop();
+    initAutoSave();
+    loadSavedData();
+});

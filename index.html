@@ -31,7 +31,7 @@
             </section>
 
             <!-- Personal Information -->
-            <section class="form-section">
+            <section class="form-section" data-section-id="personal">
                 <h2>Personal Information</h2>
                 <div class="form-group">
                     <label for="fullName">Full Name</label>
@@ -53,8 +53,15 @@
             </section>
 
             <!-- Certificates and Ratings -->
-            <section class="form-section">
-                <h2>Certificates and Ratings</h2>
+            <section class="form-section draggable-section" data-section-id="certificates" draggable="true">
+                <div class="section-header">
+                    <span class="drag-handle" title="Drag to reorder">☰</span>
+                    <h2 class="section-title" contenteditable="true" spellcheck="false">Certificates and Ratings</h2>
+                    <div class="section-arrows">
+                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
+                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
+                    </div>
+                </div>
                 <div id="certificates-container">
                     <div class="certificate-entry">
                         <input type="text" class="certificate-input" placeholder="Commercial Certificate with Instrument..." spellcheck="true">
@@ -65,8 +72,15 @@
             </section>
 
             <!-- Hours -->
-            <section class="form-section">
-                <h2>Flight Hours</h2>
+            <section class="form-section draggable-section" data-section-id="hours" draggable="true">
+                <div class="section-header">
+                    <span class="drag-handle" title="Drag to reorder">☰</span>
+                    <h2 class="section-title" contenteditable="true" spellcheck="false">Flight Hours</h2>
+                    <div class="section-arrows">
+                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
+                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
+                    </div>
+                </div>
                 <div id="hours-container">
                     <div class="hours-entry">
                         <label class="hours-label-fixed">Total Hours</label>
@@ -97,8 +111,15 @@
             </section>
 
             <!-- Work Experience -->
-            <section class="form-section">
-                <h2>Work Experience</h2>
+            <section class="form-section draggable-section" data-section-id="experience" draggable="true">
+                <div class="section-header">
+                    <span class="drag-handle" title="Drag to reorder">☰</span>
+                    <h2 class="section-title" contenteditable="true" spellcheck="false">Work Experience</h2>
+                    <div class="section-arrows">
+                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
+                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
+                    </div>
+                </div>
                 <div id="experience-container">
                     <div class="experience-entry">
                         <div class="form-group">
@@ -137,8 +158,15 @@
             </section>
 
             <!-- Education -->
-            <section class="form-section">
-                <h2>Education</h2>
+            <section class="form-section draggable-section" data-section-id="education" draggable="true">
+                <div class="section-header">
+                    <span class="drag-handle" title="Drag to reorder">☰</span>
+                    <h2 class="section-title" contenteditable="true" spellcheck="false">Education</h2>
+                    <div class="section-arrows">
+                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
+                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
+                    </div>
+                </div>
                 <div id="education-container">
                     <div class="education-entry">
                         <div class="form-group">
@@ -164,8 +192,15 @@
             </section>
 
             <!-- Aviation Training -->
-            <section class="form-section">
-                <h2>Aviation Training & Education</h2>
+            <section class="form-section draggable-section" data-section-id="training" draggable="true">
+                <div class="section-header">
+                    <span class="drag-handle" title="Drag to reorder">☰</span>
+                    <h2 class="section-title" contenteditable="true" spellcheck="false">Aviation Training & Education</h2>
+                    <div class="section-arrows">
+                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
+                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
+                    </div>
+                </div>
                 <div id="training-container">
                     <div class="training-entry">
                         <div class="form-group">
@@ -191,8 +226,15 @@
             </section>
 
             <!-- Volunteer Experience & Community Involvement -->
-            <section class="form-section">
-                <h2>Volunteer Experience & Community Involvement</h2>
+            <section class="form-section draggable-section" data-section-id="volunteer" draggable="true">
+                <div class="section-header">
+                    <span class="drag-handle" title="Drag to reorder">☰</span>
+                    <h2 class="section-title" contenteditable="true" spellcheck="false">Volunteer Experience & Community Involvement</h2>
+                    <div class="section-arrows">
+                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
+                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
+                    </div>
+                </div>
                 <div id="volunteer-container">
                     <div class="volunteer-entry">
                         <div class="form-group">
@@ -231,8 +273,15 @@
             </section>
 
             <!-- References -->
-            <section class="form-section">
-                <h2>References</h2>
+            <section class="form-section draggable-section" data-section-id="references" draggable="true">
+                <div class="section-header">
+                    <span class="drag-handle" title="Drag to reorder">☰</span>
+                    <h2 class="section-title" contenteditable="true" spellcheck="false">References</h2>
+                    <div class="section-arrows">
+                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
+                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
+                    </div>
+                </div>
                 <p class="import-description">Leave blank to display "References available upon request"</p>
                 <div id="references-container">
                     <div class="reference-entry">
@@ -268,6 +317,7 @@
                 <button class="generate-btn" onclick="generateResume()">Generate Resume</button>
                 <button class="export-btn" onclick="exportPDF()">Export to PDF</button>
                 <button class="check-btn" onclick="runSpellCheck()">Check Spelling & Get Suggestions</button>
+                <span id="autoSaveIndicator" class="auto-save-indicator">Auto-saved</span>
             </div>
             <div class="action-buttons" style="margin-top: 8px;">
                 <button class="save-btn" onclick="saveFormData()">Save Progress</button>
