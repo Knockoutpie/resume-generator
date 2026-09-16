@@ -191,6 +191,14 @@ check('company / title / dates split correctly', () => {
   if (e[0].title.indexOf('Data Analyst') === -1) return 'title wrong: ' + e[0].title;
   return eq(e[0].startDate, 'March 2021', 'start date');
 });
+check('BUG 10 — removing a date leaves no empty brackets behind', () => {
+  const e = parseEntries([
+    line('Acme Air', { bold: true }),
+    line('Developer (Oct 2025 - Present) · Analyst (Mar 2021 - Oct 2025)')
+  ], false);
+  const joined = e.map(x => x.company + '|' + x.title).join(' ');
+  return /\(\s*\)/.test(joined) ? 'empty parens survived: ' + joined : true;
+});
 check('wrapped bullet tails are rejoined, not split into entries', () => {
   const e = parseEntries([
     line('Acme Air', { x: 40, bold: true }),

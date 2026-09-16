@@ -268,7 +268,13 @@ const EDU_TOK = /\b(university|college|institute|school|academy|seminary)\b/i;
 const BULLET_GLYPH = /^\s*[\u2022\u25cf\u25cb\u25a0\u25e6\u25aa\u2023\u2043\u00b7*]\s*/;
 
 const stripBullet = t => t.replace(BULLET_GLYPH, '').trim();
-const clean = t => t.replace(/\s+/g, ' ').replace(/^[\s,;|\u2013\u2014\-\u00b7]+|[\s,;|\u2013\u2014\-\u00b7]+$/g, '').trim();
+/* Pulling a date out of "Developer (Oct 2025 - Present)" leaves "Developer ( )",
+ * so empty bracket pairs are dropped before whitespace is collapsed. */
+const clean = t => t
+    .replace(/\(\s*\)|\[\s*\]|\{\s*\}/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,;|\u2013\u2014\-\u00b7]+|[\s,;|\u2013\u2014\-\u00b7]+$/g, '')
+    .trim();
 
 const QUAL_SPLIT = /\s+[–—]\s+|\s+-\s+|:|\(/;
 
