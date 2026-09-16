@@ -1,371 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resume Generator</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resume Generator</title>
+<link rel="stylesheet" href="styles.css">
+<!-- Pinned versions. jsPDF builds the export; pdf.js reads imported PDFs.
+     DOCX files are unzipped natively, so no third library is needed. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
-    <div class="app-container">
-        <!-- Left Panel: Form Input -->
-        <div class="form-panel">
-            <h1>Resume Generator</h1>
+<div class="app-container">
 
-            <!-- Import Resume Section -->
-            <section class="form-section import-section">
-                <h2>Import Existing Resume</h2>
-                <p class="import-description">Upload a PDF or DOCX file to auto-fill the form</p>
-                <div class="import-container">
-                    <input type="file" id="resumeFile" accept=".pdf,.docx" onchange="handleFileImport(event)">
-                    <label for="resumeFile" class="import-btn">
-                        <span class="import-icon">📄</span>
-                        Choose File (PDF or DOCX)
-                    </label>
-                    <span id="fileName" class="file-name"></span>
-                </div>
-                <div id="importStatus" class="import-status"></div>
-            </section>
+  <div class="form-panel" id="form-panel">
+    <header class="app-head">
+      <h1>Resume Generator</h1>
+      <p class="sub">Built for pilot resumes, works for any resume. Everything stays in this browser.</p>
+    </header>
 
-            <!-- Personal Information -->
-            <section class="form-section" data-section-id="personal">
-                <h2>Personal Information</h2>
-                <div class="form-group">
-                    <label for="fullName">Full Name</label>
-                    <input type="text" id="fullName" placeholder="Your Full Name" spellcheck="true">
-                    <div class="spell-suggestions"></div>
-                </div>
-                <div class="form-group">
-                    <label for="address">Address</label>
-                    <input type="text" id="address" placeholder="Street Address, City, State ZIP">
-                </div>
-                <div class="form-group">
-                    <label for="phone">Phone</label>
-                    <input type="tel" id="phone" placeholder="(555) 555-5555">
-                </div>
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" placeholder="your.email@example.com">
-                </div>
-            </section>
+    <section class="form-section import-section">
+      <h2>Import an Existing Resume</h2>
+      <p class="section-note">Upload a PDF or DOCX to fill the form automatically. Always check the result.</p>
+      <div class="import-container">
+        <input type="file" id="resumeFile" accept=".pdf,.docx" onchange="handleFileImport(event)">
+        <label for="resumeFile" class="import-btn"><span>&#128196;</span> Choose File (PDF or DOCX)</label>
+        <span id="fileName" class="file-name"></span>
+      </div>
+      <div id="importStatus" class="import-status"></div>
+    </section>
 
-            <!-- Certificates and Ratings -->
-            <section class="form-section draggable-section" data-section-id="certificates" draggable="true">
-                <div class="section-header">
-                    <span class="drag-handle" title="Drag to reorder">☰</span>
-                    <h2 class="section-title" contenteditable="true" spellcheck="false">Certificates and Ratings</h2>
-                    <div class="section-arrows">
-                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
-                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
-                    </div>
-                </div>
-                <div id="certificates-container">
-                    <div class="certificate-entry">
-                        <input type="text" class="certificate-input" placeholder="Commercial Certificate with Instrument..." spellcheck="true">
-                        <button class="remove-btn" onclick="removeEntry(this)">×</button>
-                    </div>
-                </div>
-                <button class="add-btn" onclick="addCertificate()">+ Add Certificate</button>
-            </section>
-
-            <!-- Hours -->
-            <section class="form-section draggable-section" data-section-id="hours" draggable="true">
-                <div class="section-header">
-                    <span class="drag-handle" title="Drag to reorder">☰</span>
-                    <h2 class="section-title" contenteditable="true" spellcheck="false">Flight Hours</h2>
-                    <div class="section-arrows">
-                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
-                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
-                    </div>
-                </div>
-                <div id="hours-container">
-                    <div class="hours-entry">
-                        <label class="hours-label-fixed">Total Hours</label>
-                        <input type="number" class="hours-value" data-label="Total Hours" placeholder="0">
-                    </div>
-                    <div class="hours-entry">
-                        <label class="hours-label-fixed">Multi Engine</label>
-                        <input type="number" class="hours-value" data-label="Multi Engine" placeholder="0">
-                    </div>
-                    <div class="hours-entry">
-                        <label class="hours-label-fixed">Pilot in Command</label>
-                        <input type="number" class="hours-value" data-label="Pilot in Command" placeholder="0">
-                    </div>
-                    <div class="hours-entry">
-                        <label class="hours-label-fixed">Instrument (Simulated & Actual)</label>
-                        <input type="number" class="hours-value" data-label="Instrument (Simulated & Actual)" placeholder="0">
-                    </div>
-                    <div class="hours-entry">
-                        <label class="hours-label-fixed">Cross Country</label>
-                        <input type="number" class="hours-value" data-label="Cross Country" placeholder="0">
-                    </div>
-                    <div class="hours-entry">
-                        <label class="hours-label-fixed">Night</label>
-                        <input type="number" class="hours-value" data-label="Night" placeholder="0">
-                    </div>
-                </div>
-                <button class="add-btn" onclick="addHours()">+ Add Custom Hours Entry</button>
-            </section>
-
-            <!-- Work Experience -->
-            <section class="form-section draggable-section" data-section-id="experience" draggable="true">
-                <div class="section-header">
-                    <span class="drag-handle" title="Drag to reorder">☰</span>
-                    <h2 class="section-title" contenteditable="true" spellcheck="false">Work Experience</h2>
-                    <div class="section-arrows">
-                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
-                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
-                    </div>
-                </div>
-                <div id="experience-container">
-                    <div class="experience-entry">
-                        <div class="form-group">
-                            <label>Company Name</label>
-                            <input type="text" class="company-name" placeholder="Company Name" spellcheck="true">
-                        </div>
-                        <div class="form-group">
-                            <label>Job Title</label>
-                            <input type="text" class="job-title" placeholder="Job Title" spellcheck="true">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Start Date</label>
-                                <input type="text" class="start-date" placeholder="Month Year">
-                            </div>
-                            <div class="form-group">
-                                <label>End Date</label>
-                                <input type="text" class="end-date" placeholder="Present">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Responsibilities</label>
-                            <div class="responsibilities-container">
-                                <div class="bullet-entry">
-                                    <span class="bullet-icon">•</span>
-                                    <input type="text" class="bullet-input" placeholder="Developed AI-powered automation workflows using Python" spellcheck="true">
-                                    <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
-                                </div>
-                            </div>
-                            <button class="add-bullet-btn" onclick="addBullet(this)">+ Add Bullet Point</button>
-                        </div>
-                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Job</button>
-                    </div>
-                </div>
-                <button class="add-btn" onclick="addExperience()">+ Add Work Experience</button>
-            </section>
-
-            <!-- Education -->
-            <section class="form-section draggable-section" data-section-id="education" draggable="true">
-                <div class="section-header">
-                    <span class="drag-handle" title="Drag to reorder">☰</span>
-                    <h2 class="section-title" contenteditable="true" spellcheck="false">Education</h2>
-                    <div class="section-arrows">
-                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
-                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
-                    </div>
-                </div>
-                <div id="education-container">
-                    <div class="education-entry">
-                        <div class="form-group">
-                            <label>Institution Name</label>
-                            <input type="text" class="institution-name" placeholder="University or School Name" spellcheck="true">
-                        </div>
-                        <div class="form-group">
-                            <label>Degree / Program</label>
-                            <input type="text" class="degree" placeholder="Degree and Major" spellcheck="true">
-                        </div>
-                        <div class="form-group">
-                            <label>Date</label>
-                            <input type="text" class="edu-date" placeholder="Month Year">
-                        </div>
-                        <div class="form-group">
-                            <label>Additional Details (one per line)</label>
-                            <textarea class="edu-details" rows="3" placeholder="Minor, honors, GPA, relevant coursework&#10;Study abroad, certifications, etc." spellcheck="true"></textarea>
-                        </div>
-                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Education</button>
-                    </div>
-                </div>
-                <button class="add-btn" onclick="addEducation()">+ Add Education</button>
-            </section>
-
-            <!-- Aviation Training -->
-            <section class="form-section draggable-section" data-section-id="training" draggable="true">
-                <div class="section-header">
-                    <span class="drag-handle" title="Drag to reorder">☰</span>
-                    <h2 class="section-title" contenteditable="true" spellcheck="false">Aviation Training & Education</h2>
-                    <div class="section-arrows">
-                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
-                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
-                    </div>
-                </div>
-                <div id="training-container">
-                    <div class="training-entry">
-                        <div class="form-group">
-                            <label>School / Training Provider</label>
-                            <input type="text" class="training-school" placeholder="ATP Flight School, FlightSafety International..." spellcheck="true">
-                        </div>
-                        <div class="form-group">
-                            <label>Program / Course</label>
-                            <input type="text" class="training-program" placeholder="Multi-Engine Rating, Part 141 Private Pilot..." spellcheck="true">
-                        </div>
-                        <div class="form-group">
-                            <label>Date</label>
-                            <input type="text" class="training-date" placeholder="Month Year">
-                        </div>
-                        <div class="form-group">
-                            <label>Additional Details (one per line)</label>
-                            <textarea class="training-details" rows="2" placeholder="Aircraft types, honors, achievements..." spellcheck="true"></textarea>
-                        </div>
-                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Training</button>
-                    </div>
-                </div>
-                <button class="add-btn" onclick="addTraining()">+ Add Training</button>
-            </section>
-
-            <!-- Volunteer Experience & Community Involvement -->
-            <section class="form-section draggable-section" data-section-id="volunteer" draggable="true">
-                <div class="section-header">
-                    <span class="drag-handle" title="Drag to reorder">☰</span>
-                    <h2 class="section-title" contenteditable="true" spellcheck="false">Volunteer Experience & Community Involvement</h2>
-                    <div class="section-arrows">
-                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
-                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
-                    </div>
-                </div>
-                <div id="volunteer-container">
-                    <div class="volunteer-entry">
-                        <div class="form-group">
-                            <label>Organization</label>
-                            <input type="text" class="volunteer-org" placeholder="Organization Name" spellcheck="true">
-                        </div>
-                        <div class="form-group">
-                            <label>Role</label>
-                            <input type="text" class="volunteer-role" placeholder="Volunteer Role or Title" spellcheck="true">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Start Date</label>
-                                <input type="text" class="volunteer-start" placeholder="Month Year">
-                            </div>
-                            <div class="form-group">
-                                <label>End Date</label>
-                                <input type="text" class="volunteer-end" placeholder="Present">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <div class="responsibilities-container">
-                                <div class="bullet-entry">
-                                    <span class="bullet-icon">•</span>
-                                    <input type="text" class="bullet-input" placeholder="Organized community outreach events..." spellcheck="true">
-                                    <button class="remove-bullet-btn" onclick="removeBullet(this)">×</button>
-                                </div>
-                            </div>
-                            <button class="add-bullet-btn" onclick="addBullet(this)">+ Add Bullet Point</button>
-                        </div>
-                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Entry</button>
-                    </div>
-                </div>
-                <button class="add-btn" onclick="addVolunteer()">+ Add Volunteer Experience</button>
-            </section>
-
-            <!-- References -->
-            <section class="form-section draggable-section" data-section-id="references" draggable="true">
-                <div class="section-header">
-                    <span class="drag-handle" title="Drag to reorder">☰</span>
-                    <h2 class="section-title" contenteditable="true" spellcheck="false">References</h2>
-                    <div class="section-arrows">
-                        <button class="arrow-btn" onclick="moveSectionUp(this)" title="Move up">▲</button>
-                        <button class="arrow-btn" onclick="moveSectionDown(this)" title="Move down">▼</button>
-                    </div>
-                </div>
-                <p class="import-description">Leave blank to display "References available upon request"</p>
-                <div id="references-container">
-                    <div class="reference-entry">
-                        <div class="form-group">
-                            <label>Name</label>
-                            <input type="text" class="ref-name" placeholder="Reference Full Name" spellcheck="true">
-                        </div>
-                        <div class="form-group">
-                            <label>Title / Relationship</label>
-                            <input type="text" class="ref-title" placeholder="Chief Pilot, Former Supervisor..." spellcheck="true">
-                        </div>
-                        <div class="form-group">
-                            <label>Company / Organization</label>
-                            <input type="text" class="ref-company" placeholder="Company Name" spellcheck="true">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Phone</label>
-                                <input type="tel" class="ref-phone" placeholder="(555) 555-5555">
-                            </div>
-                            <div class="form-group">
-                                <label>Email</label>
-                                <input type="email" class="ref-email" placeholder="reference@email.com">
-                            </div>
-                        </div>
-                        <button class="remove-btn remove-section" onclick="removeEntry(this)">Remove Reference</button>
-                    </div>
-                </div>
-                <button class="add-btn" onclick="addReference()">+ Add Reference</button>
-            </section>
-
-            <div class="action-buttons">
-                <button class="generate-btn" onclick="generateResume()">Generate Resume</button>
-                <button class="export-btn" onclick="exportPDF()">Export to PDF</button>
-                <button class="check-btn" onclick="runSpellCheck()">Check Spelling & Get Suggestions</button>
-                <span id="autoSaveIndicator" class="auto-save-indicator">Auto-saved</span>
-            </div>
-            <div class="action-buttons" style="margin-top: 8px;">
-                <button class="save-btn" onclick="saveFormData()">Save Progress</button>
-                <button class="save-btn" onclick="exportFormJSON()">Export Data (JSON)</button>
-                <button class="save-btn" onclick="document.getElementById('importJSON').click()">Load Data (JSON)</button>
-                <input type="file" id="importJSON" accept=".json" onchange="importFormJSON(event)" style="display:none;">
-            </div>
+    <section class="form-section">
+      <h2>Personal Information</h2>
+      <div class="form-group">
+        <label for="fullName">Full Name</label>
+        <input type="text" id="fullName" class="field" placeholder="Your Full Name" spellcheck="true">
+      </div>
+      <div class="form-group">
+        <label for="address">Address</label>
+        <input type="text" id="address" class="field" placeholder="City, State ZIP">
+      </div>
+      <div class="form-row">
+        <div class="form-group half">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" class="field" placeholder="(555) 555-5555">
         </div>
-
-        <!-- Right Panel: Preview and Suggestions -->
-        <div class="preview-panel">
-            <div class="tabs">
-                <button class="tab-btn active" onclick="showTab('preview')">Resume Preview</button>
-                <button class="tab-btn" onclick="showTab('suggestions')">Spelling & Suggestions</button>
-            </div>
-
-            <div id="preview-tab" class="tab-content active">
-                <div id="resume-preview" class="resume-preview">
-                    <p class="placeholder-text">Fill out the form and click "Generate Resume" to see your preview</p>
-                </div>
-            </div>
-
-            <div id="suggestions-tab" class="tab-content">
-                <div class="suggestions-panel">
-                    <h3>Spelling Errors</h3>
-                    <div id="spelling-errors" class="suggestion-list">
-                        <p class="no-issues">No spelling errors found</p>
-                    </div>
-
-                    <h3>Word Improvement Suggestions</h3>
-                    <div id="word-suggestions" class="suggestion-list">
-                        <p class="no-issues">Click "Check Spelling & Get Suggestions" to analyze your resume</p>
-                    </div>
-
-                    <h3>Resume Tips</h3>
-                    <div id="resume-tips" class="suggestion-list">
-                        <ul>
-                            <li>Use action verbs to start bullet points</li>
-                            <li>Quantify achievements when possible</li>
-                            <li>Keep descriptions concise and impactful</li>
-                            <li>Tailor content to the target position</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+        <div class="form-group half">
+          <label for="email">Email</label>
+          <input type="email" id="email" class="field" placeholder="you@example.com">
         </div>
+      </div>
+      <div class="form-group">
+        <label for="links">Links (optional)</label>
+        <input type="text" id="links" class="field" placeholder="linkedin.com/in/yourname">
+      </div>
+    </section>
+
+    <section class="form-section toggles-section">
+      <h2>Sections</h2>
+      <p class="section-note">Click to add or remove a section. Drag the &#9776; handle to reorder, or click a heading to rename it.</p>
+      <div id="section-toggles" class="toggle-chips"></div>
+    </section>
+
+    <div id="sections-host"></div>
+
+    <section class="form-section">
+      <h2>Export Options</h2>
+      <label class="check-row">
+        <input type="checkbox" id="twoColHours">
+        <span>Compact two-column certificates &amp; hours.
+          <em>Looks tighter, but single column is safer for applicant tracking systems.</em></span>
+      </label>
+    </section>
+
+    <div class="action-buttons">
+      <button class="generate-btn" type="button" onclick="generateResume()">Refresh Preview</button>
+      <button class="export-btn" type="button" onclick="exportPDF()">Export to PDF</button>
+      <button class="check-btn" type="button" onclick="runSpellCheck()">Check Spelling &amp; Wording</button>
+      <span id="autoSaveIndicator" class="auto-save-indicator">Saved</span>
+    </div>
+    <div class="action-buttons secondary">
+      <button class="save-btn" type="button" onclick="saveFormData()">Save Now</button>
+      <button class="save-btn" type="button" onclick="exportFormJSON()">Export Data (JSON)</button>
+      <button class="save-btn" type="button" onclick="document.getElementById('importJSON').click()">Load Data (JSON)</button>
+      <button class="save-btn danger" type="button" onclick="clearAll()">Clear All</button>
+      <input type="file" id="importJSON" accept=".json" onchange="importFormJSON(event)" hidden>
+    </div>
+  </div>
+
+  <div class="preview-panel">
+    <div class="tabs">
+      <button class="tab-btn active" type="button" data-tab="preview">Resume Preview</button>
+      <button class="tab-btn" type="button" data-tab="suggestions">Spelling &amp; Suggestions</button>
     </div>
 
-    <script src="app.js"></script>
+    <div id="preview-tab" class="tab-content active">
+      <div id="resume-preview" class="resume-preview"></div>
+    </div>
+
+    <div id="suggestions-tab" class="tab-content">
+      <div class="suggestions-panel">
+        <h3>Spelling</h3>
+        <div id="spelling-errors" class="suggestion-list">
+          <p class="no-issues">Run the check to see results.</p>
+        </div>
+        <h3>Wording</h3>
+        <div id="word-suggestions" class="suggestion-list">
+          <p class="no-issues">Run the check to see results.</p>
+        </div>
+        <h3>What Actually Helps</h3>
+        <div class="suggestion-list">
+          <ul>
+            <li>Lead each bullet with an action verb.</li>
+            <li>Put a number in as many bullets as you honestly can.</li>
+            <li>Name the specific aircraft, systems, or tools you used.</li>
+            <li>Keep one column and a standard font so parsers read it cleanly.</li>
+            <li>Mirror the wording of the job posting where it is genuinely true of you.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/sections.js"></script>
+<script src="js/form.js"></script>
+<script src="js/spell.js"></script>
+<script src="js/render.js"></script>
+<script src="js/import.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
