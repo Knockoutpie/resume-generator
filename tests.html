@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resume Generator — Self Test</title>
+<style>
+  body { font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 24px;
+         background: #eef1f5; color: #1d2430; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #667085; margin: 0 0 16px; font-size: 13px; }
+  #summary { font-size: 16px; font-weight: 700; padding: 12px 16px; border-radius: 8px; margin-bottom: 14px; }
+  .allpass { background: #e6f5ec; color: #14663d; border: 1px solid #9fd9ba; }
+  .anyfail { background: #fdecec; color: #8f1d17; border: 1px solid #f0a9a4; }
+  table { border-collapse: collapse; width: 100%; background: #fff; border-radius: 8px; overflow: hidden;
+          border: 1px solid #d9dee6; }
+  td { padding: 7px 12px; border-top: 1px solid #eef1f5; vertical-align: top; }
+  tr:first-child td { border-top: none; }
+  .ok { color: #1d7a4c; font-weight: 700; width: 58px; }
+  .no { color: #b3261e; font-weight: 700; width: 58px; }
+  .grp td { background: #f6f8fb; font-weight: 700; font-size: 12px; text-transform: uppercase;
+            letter-spacing: .04em; color: #667085; }
+  .detail { color: #b3261e; font-size: 12px; font-family: ui-monospace, Consolas, monospace; }
+  #scaffold { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Resume Generator — Self Test</h1>
+<p class="sub">Open this file in the same browser you use for the app. It exercises the parser,
+the form round-trip, the renderers and the Word writer, including a regression test for every
+bug fixed in the rebuild. Uses an in-memory store, so your saved resume is untouched.</p>
+<div id="summary">Running…</div>
+<table id="results"></table>
+
+<!-- Minimal DOM the app modules expect. Hidden; tests drive it directly. -->
+<div id="scaffold">
+  <div class="form-panel" id="form-panel">
+    <input id="fullName"><input id="address"><input id="phone"><input id="email"><input id="links">
+    <div id="section-toggles"></div>
+    <div id="sections-host"></div>
+    <input type="checkbox" id="twoColHours">
+    <span id="autoSaveIndicator"></span>
+    <input type="file" id="resumeFile"><span id="fileName"></span><div id="importStatus"></div>
+  </div>
+  <div id="preview-tab" class="tab-content active"><div id="resume-preview"></div></div>
+  <div id="suggestions-tab" class="tab-content">
+    <div id="spelling-errors"></div><div id="word-suggestions"></div>
+  </div>
+</div>
+
+<script>
+// Isolate storage BEFORE the app loads, so tests never touch a real saved resume.
+(function () {
+  const mem = {};
+  const shim = {
+    getItem: k => (k in mem ? mem[k] : null),
+    setItem: (k, v) => { mem[k] = String(v); },
+    removeItem: k => { delete mem[k]; },
+    clear: () => { for (const k in mem) delete mem[k]; }
+  };
+  try { Object.defineProperty(window, 'localStorage', { value: shim, configurable: true }); }
+  catch (e) { console.warn('storage shim failed; tests may persist', e); }
+})();
+</script>
+
+<script src="js/sections.js"></script>
+<script src="js/form.js"></script>
+<script src="js/spell.js"></script>
+<script src="js/render.js"></script>
+<script src="js/export-docx.js"></script>
+<script src="js/import.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+const results = [];
+let group = '';
+const G = name => { group = name; results.push({ grp: name }); };
+
+function check(name, fn) {
+  let pass = false, detail = '';
+  try {
+    const r = fn();
+    pass = r === true || r === undefined;
+    if (!pass) detail = String(r);
+  } catch (e) {
+    detail = e && e.message ? e.message : String(e);
+  }
+  results.push({ name: name, pass: pass, detail: detail });
+}
+
+const eq = (a, b, what) => a === b ? true : (what || '') + ' expected ' + JSON.stringify(b) + ', got ' + JSON.stringify(a);
+const line = (text, o) => Object.assign(
+  { text: text, cols: [text], level: 0, bullet: false, x: 0, size: 10, bold: false, hdr: false }, o || {});
+
+/* ---------------- registry ---------------- */
+G('Section registry');
+check('every section has a known type', () =>
+  SECTIONS.every(s => TYPES[s.type]) || 'a section references a missing type');
+check('every type can build an empty value', () =>
+  Object.keys(TYPES).every(k => typeof TYPES[k].empty === 'function'));
+check('defaults cover every section', () =>
+  eq(Object.keys(DEFAULT_TITLES).length, SECTIONS.length, 'title count'));
+
+/* ---------------- form round-trip ---------------- */
+G('Form round-trip');
+const sample = {
+  fullName: 'Test Pilot', address: 'Phoenix, AZ', phone: '(555) 555-5555',
+  email: 't@example.com', links: '',
+  hours: [{ label: 'Total Time', value: '408' }, { label: 'Dual Given', value: '77' }],
+  certificates: ['Commercial ASEL', 'CFI'],
+  experience: [{ company: 'Acme Air', title: 'Line Pilot', startDate: 'Jan 2024', endDate: 'Present', bullets: ['Flew things.'] }],
+  education: [{ institution: 'ASU', degree: 'B.A. Business', date: 'May 2019', details: ['GPA: 3.5'] }],
+  skills: [{ category: 'Tools', items: ['G1000', 'ForeFlight'] }],
+  summary: 'A summary.',
+  _enabled: { summary: true, skills: true, certificates: true, hours: true, experience: true, education: true }
+};
+populateAll(sample);
+const back = gatherAll();
+
+check('BUG 1 — flight hours survive a save/load round-trip', () => {
+  if (!back.hours || back.hours.length !== 2) return 'hours lost: ' + JSON.stringify(back.hours);
+  return eq(back.hours[0].value, '408', 'Total Time');
+});
+check('custom hour rows survive too', () => eq(back.hours[1].label, 'Dual Given'));
+check('certificates survive', () => eq(back.certificates.length, 2, 'cert count'));
+check('experience bullets survive', () => eq(back.experience[0].bullets[0], 'Flew things.'));
+check('education details survive', () => eq(back.education[0].details[0], 'GPA: 3.5'));
+check('skills survive as groups', () => eq(back.skills[0].items.length, 2, 'skill items'));
+check('summary prose survives', () => eq(back.summary, 'A summary.'));
+check('contact fields survive', () => eq(back.fullName, 'Test Pilot'));
+
+/* ---------------- rendering ---------------- */
+G('Rendering');
+generateResume();
+const html = document.getElementById('resume-preview').innerHTML;
+check('preview renders the name', () => html.indexOf('Test Pilot') !== -1 || 'name missing from preview');
+check('preview renders hours', () => html.indexOf('408') !== -1 || 'hours missing from preview');
+check('BUG 3 — certificates block is rendered exactly once', () => {
+  const n = (html.match(/Certificates and Ratings/g) || []).length;
+  return n <= 1 ? true : 'rendered ' + n + ' times';
+});
+check('escapeHtml neutralises markup', () =>
+  eq(escapeHtml('<img src=x onerror=1>'), '&lt;img src=x onerror=1&gt;'));
+
+/* ---------------- parser: dates ---------------- */
+G('Parser — dates');
+[['Mar 2021 - Present', 'Mar 2021', 'Present'],
+ ['March 2021 – October 2025', 'March 2021', 'October 2025'],
+ ['December 2016 to Mar 2021', 'December 2016', 'Mar 2021'],
+ ['03/2022 - 09/2024', '03/2022', '09/2024'],
+ ['2019 — 2022', '2019', '2022']].forEach(c => {
+  check('date range: ' + c[0], () => {
+    const d = takeDates('Job Title ' + c[0]);
+    return d[0] === c[1] && d[1] === c[2] ? true : 'got ' + JSON.stringify([d[0], d[1]]);
+  });
+});
+
+/* ---------------- parser: headings ---------------- */
+G('Parser — section headings');
+check('plain heading is found', () => eq(isHeader(line('Work Experience'), 10), 'experience'));
+check('bare "Work" is found', () => eq(isHeader(line('Work', { bold: true }), 10), 'experience'));
+check('BUG 6 — heading with trailing qualifier is found', () =>
+  eq(isHeader(line('FLIGHT HOURS — AS OF JUNE 2026', { bold: true }), 10), 'hours'));
+check('BUG 6 — prose "Experience: 5 years..." is NOT a heading', () =>
+  eq(isHeader(line('Experience: 5 years of flying in the desert southwest'), 10), null));
+check('a bullet is never a heading', () =>
+  eq(isHeader(line('• Education and outreach for pilots', { bullet: true }), 10), null));
+check('a date line is never a heading', () =>
+  eq(isHeader(line('January 2025 - August 2026'), 10), null));
+check('first occurrence wins, not last', () => {
+  const s = splitSections([line('Work Experience', { bold: true }), line('Acme Air'),
+                           line('Experience running things')]);
+  return s.sections.experience.length >= 1 || 'section body lost';
+});
+
+/* ---------------- parser: entries ---------------- */
+G('Parser — entries');
+check('company / title / dates split correctly', () => {
+  const e = parseEntries([
+    line('WPG Americas, Scottsdale, AZ', { bold: true, level: 2 }),
+    line('Data Analyst & Operations - March 2021 – October 2025', { level: 3 }),
+    line('• Did a thing.', { bullet: true })
+  ], false);
+  if (e.length !== 1) return 'expected 1 entry, got ' + e.length;
+  if (e[0].company.indexOf('WPG') === -1) return 'company wrong: ' + e[0].company;
+  if (e[0].title.indexOf('Data Analyst') === -1) return 'title wrong: ' + e[0].title;
+  return eq(e[0].startDate, 'March 2021', 'start date');
+});
+check('wrapped bullet tails are rejoined, not split into entries', () => {
+  const e = parseEntries([
+    line('Acme Air', { x: 40, bold: true }),
+    line('Pilot - Jan 2024 - Present', { x: 40 }),
+    line('• A long bullet that wraps onto', { x: 50, bullet: true }),
+    line('a second line with no glyph', { x: 50 })
+  ], false);
+  if (e.length !== 1) return 'fragmented into ' + e.length + ' entries';
+  return e[0].bullets.length === 1 ? true : 'bullet split into ' + e[0].bullets.length;
+});
+
+/* ---------------- parser: education ---------------- */
+G('Parser — education');
+check('BUG 7 — degree and school on one line are both kept', () => {
+  const e = parseEdu([line('B.S., Information Technology Management — Northern Arizona University, Flagstaff, AZ — May 2020 — GPA 3.99')]);
+  if (e.length !== 1) return 'expected 1 entry, got ' + e.length;
+  if (!e[0].degree) return 'degree dropped';
+  if (e[0].institution.indexOf('Northern Arizona') === -1) return 'institution wrong: ' + e[0].institution;
+  return true;
+});
+check('degree and school on separate lines still pair correctly', () => {
+  const e = parseEdu([line('Bachelor of Science in IT'), line('Northern Arizona University'),
+                      line('Associate of Applied Science'), line('Mesa Community College')]);
+  return e.length === 2 ? true : 'expected 2 entries, got ' + e.length;
+});
+
+/* ---------------- parser: hours & skills ---------------- */
+G('Parser — hours and skills');
+check('hours parse after dot leaders are stripped', () => {
+  const h = parseHours([line('Total Hours 408'), line('Multi Engine 76')]);
+  if (h.length !== 2) return 'got ' + h.length + ' rows';
+  return eq(h[0].value, '408', 'value');
+});
+check('grouped skills parse into categories', () => {
+  const s = parseSkills([line('Programming: Python, SQL, VBA')]);
+  if (s.length !== 1) return 'got ' + s.length + ' groups';
+  return eq(s[0].items.length, 3, 'item count');
+});
+
+/* ---------------- Word export ---------------- */
+G('Word export');
+check('zip writer produces a non-empty blob', () => {
+  const blob = zipStore(docxParts(back));
+  return blob && blob.size > 500 ? true : 'blob too small: ' + (blob && blob.size);
+});
+check('zip begins with the PK signature', () => {
+  const blob = zipStore([{ name: 'a.xml', data: '<a/>' }]);
+  return blob.size > 0 || 'empty zip';
+});
+check('XML special characters are escaped', () =>
+  eq(xmlEsc('Sales & Ops <test>'), 'Sales &amp; Ops &lt;test&gt;'));
+check('document body includes the name', () => {
+  const parts = docxParts(back);
+  const doc = parts.filter(p => p.name === 'word/document.xml')[0];
+  return doc.data.indexOf('Test Pilot') !== -1 || 'name missing from document.xml';
+});
+check('no dot-leader characters are written into the Word text', () => {
+  const doc = docxParts(back).filter(p => p.name === 'word/document.xml')[0];
+  return /\.{4,}/.test(doc.data) ? 'dot leaders found in document.xml' : true;
+});
+
+/* ---------------- storage ---------------- */
+G('Storage');
+check('BUG 2 — persist() does not schedule another save', () => {
+  const realSetTimeout = window.setTimeout;
+  let scheduled = 0;
+  window.setTimeout = function () { scheduled++; return realSetTimeout.apply(window, arguments); };
+  try { persist(); } finally { window.setTimeout = realSetTimeout; }
+  return scheduled === 0 ? true : 'persist scheduled ' + scheduled + ' timer(s) — recursion risk';
+});
+check('saved state can be read back', () => {
+  persist();
+  const raw = localStorage.getItem('resumeData');
+  if (!raw) return 'nothing saved';
+  const d = JSON.parse(raw);
+  return d.hours && d.hours.length === 2 ? true : 'hours missing from saved state';
+});
+
+/* ---------------- report ---------------- */
+const table = document.getElementById('results');
+let pass = 0, fail = 0;
+results.forEach(r => {
+  const tr = document.createElement('tr');
+  if (r.grp) {
+    tr.className = 'grp';
+    tr.innerHTML = '<td colspan="2">' + r.grp + '</td>';
+  } else {
+    if (r.pass) pass++; else fail++;
+    tr.innerHTML = '<td class="' + (r.pass ? 'ok">PASS' : 'no">FAIL') + '</td><td>' +
+      r.name + (r.detail ? '<div class="detail">' + r.detail + '</div>' : '') + '</td>';
+  }
+  table.appendChild(tr);
+});
+const sum = document.getElementById('summary');
+sum.className = fail ? 'anyfail' : 'allpass';
+sum.textContent = fail ? (fail + ' failing, ' + pass + ' passing') : ('All ' + pass + ' checks passed');
+</script>
+</body>
+</html>

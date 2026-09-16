@@ -27,14 +27,22 @@ python -m http.server 8000     # then visit http://localhost:8000
 - **Import an existing resume** from PDF or DOCX and fill the form from it.
 - **Reorder, rename, add and remove sections.** Drag the ☰ handle, click a
   heading to retype it, or use the Sections chips to toggle one on or off.
-- **Live preview** that matches the exported PDF.
-- **Export to PDF**, laid out to survive machine reading (see below).
+- **Live preview** that matches the export.
+- **Export to PDF or Word (.docx)**, both laid out to survive machine reading
+  (see below). The `.docx` is written directly — no library — and is generally
+  the safer of the two for applicant tracking systems.
 - **Save and load.** Work is kept in this browser's local storage and
   auto-saved as you type. Export/Load JSON moves it between machines.
 - **Spelling and wording checks** against a built-in list, with prompts to
   lead with action verbs and quantify bullets.
 
 ## Machine readability
+
+**Prefer the Word export when a posting accepts either.** A `.docx` is structured
+XML — paragraphs, styles, explicit text — so a parser reads it directly. A PDF is
+positioned glyphs that a parser must *reconstruct* into lines and reading order,
+and that reconstruction is where resumes get mangled. Everything in the list
+below is a PDF-specific hazard.
 
 Applicant tracking systems and AI screeners read a PDF by extracting its text
 layer. Several things that look fine on paper destroy that text, so the exporter
@@ -74,14 +82,23 @@ Scanned PDFs with no text layer cannot be imported at all.
 
 ```
 index.html        markup shell
+tests.html        self-test page — open it in a browser
 styles.css        all styling
 js/sections.js    section registry — the single source of truth
 js/form.js        builds the form, reads it back, repopulates it
 js/import.js      DOCX/PDF extraction and resume parsing
 js/render.js      live preview and PDF export
+js/export-docx.js Word export (zip writer + OOXML, no dependencies)
 js/spell.js       spelling and wording checks
 js/app.js         storage, auto-save, events, drag-and-drop
 ```
+
+### Tests
+
+Open `tests.html` in the same browser you use for the app. It exercises the
+parser, the form round-trip, both renderers and the Word writer, and carries a
+regression test for every bug fixed in the rebuild. It runs against an in-memory
+store, so your saved resume is not touched. Green means safe to ship.
 
 ### Adding a section
 

@@ -243,7 +243,7 @@ const ONE_RE = new RegExp('(' + DATE + ')', 'i');
 
 const SECTION_LEX = {
     summary: ['(?:professional\\s+|career\\s+|personal\\s+)?(?:summary|objective|profile|about(?:\\s+me)?|overview)'],
-    skills: ['(?:technical|core|key|relevant|professional|additional)?\\s*(?:skills|competencies|proficiencies|expertise|qualifications)(?:\\s*(?:&|and)\\s*\\w+)?'],
+    skills: ['(?:technical|core|key|relevant|related|professional|additional|other)?\\s*(?:skills|competencies|proficiencies|expertise|qualifications)(?:\\s*(?:&|and)\\s*\\w+)?'],
     experience: ['(?:work|professional|relevant|related|industry|employment|career)?\\s*(?:experience|employment|history)', 'work', 'employment\\s+history'],
     projects: ['(?:professional\\s+|personal\\s+|key\\s+|selected\\s+)?projects?'],
     education: ['education(?:al)?(?:\\s+background)?', 'academics?', 'academic\\s+background'],
@@ -268,13 +268,30 @@ const BULLET_GLYPH = /^\s*[\u2022\u25cf\u25cb\u25a0\u25e6\u25aa\u2023\u2043\u00b
 const stripBullet = t => t.replace(BULLET_GLYPH, '').trim();
 const clean = t => t.replace(/\s+/g, ' ').replace(/^[\s,;|\u2013\u2014\-\u00b7]+|[\s,;|\u2013\u2014\-\u00b7]+$/g, '').trim();
 
+const QUAL_SPLIT = /\s+[–—]\s+|\s+-\s+|:|\(/;
+
+/* A heading often carries a trailing qualifier: "FLIGHT HOURS - AS OF JUNE 2026",
+ * "EDUCATION (continued)". We try the qualifier-stripped form as well, but only
+ * when the line is visually a heading — otherwise body prose such as
+ * "Experience: 5 years of..." would silently open a new section. */
 function isHeader(ln, bodySize) {
-    const t = ln.text.trim().replace(/:+$/, '').trim();
-    if (!t || t.length > 46 || t.split(/\s+/).length > 6) return null;
-    if (t.endsWith('.') || BULLET_GLYPH.test(ln.text)) return null;
-    if (RANGE_RE.test(t)) return null;
-    for (const sid in SECTION_RE) {
-        if (SECTION_RE[sid].some(p => p.test(t))) return sid;
+    const raw = ln.text.trim();
+    if (!raw || BULLET_GLYPH.test(raw)) return null;
+    const strong = ln.level > 0 || ln.bold || raw === raw.toUpperCase() || ln.size > bodySize + 0.6;
+
+    const full = raw.replace(/:+$/, '').trim();
+    const cands = [[full, false]];
+    const head = raw.split(QUAL_SPLIT)[0].trim().replace(/:+$/, '').trim();
+    if (head && head !== full) cands.push([head, true]);
+
+    for (let i = 0; i < cands.length; i++) {
+        const t = cands[i][0], needsStrong = cands[i][1];
+        if (!t || t.length > 46 || t.split(/\s+/).length > 6) continue;
+        if (t.endsWith('.') || RANGE_RE.test(t)) continue;
+        if (needsStrong && !strong) continue;
+        for (const sid in SECTION_RE) {
+            if (SECTION_RE[sid].some(p => p.test(t))) return sid;
+        }
     }
     return null;
 }
@@ -356,6 +373,20 @@ function parseEntries(lines, allowBare) {
     return ents.filter(e => e.company || e.title || (allowBare && e.bullets.length));
 }
 
+const EDU_SPLIT = /\s*[–—|]\s*|\s+-\s+/;
+const GPA_RE = /\(?\s*GPA[:\s]*[0-4]\.\d+\s*\)?/i;
+
+/* "B.S., IT Management - Northern Arizona University - May 2020" carries both
+ * halves on one line. Without this the institution keyword wins and the degree
+ * is dropped entirely. */
+function eduParts(t) {
+    const parts = t.split(EDU_SPLIT).map(s => s.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    const deg = parts.find(x => DEG_TOK.test(x) && !EDU_TOK.test(x)) || '';
+    const edu = parts.find(x => EDU_TOK.test(x)) || '';
+    return (deg && edu) ? { degree: deg, institution: edu } : null;
+}
+
 function parseEdu(lines) {
     const ents = [];
     const blank = () => ({ institution: '', degree: '', date: '', details: [] });
@@ -366,6 +397,17 @@ function parseEdu(lines) {
         const g = /GPA[:\s]*([0-4]\.\d+)/i.exec(t);
         const d = takeDates(t);
         const rest = clean(d[2]);
+
+        const both = eduParts(t);
+        if (both) {
+            if (cur.institution || cur.degree) { ents.push(cur); cur = blank(); }
+            cur.degree = clean(takeDates(both.degree)[2].replace(GPA_RE, ''));
+            cur.institution = clean(takeDates(both.institution)[2].replace(GPA_RE, ''));
+            if (d[0]) cur.date = (d[0] + (d[1] ? ' - ' + d[1] : '')).trim();
+            if (g) cur.details.push('GPA: ' + g[1]);
+            return;
+        }
+
         const slot = EDU_TOK.test(t) ? 'institution' : (DEG_TOK.test(t) ? 'degree' : null);
         if (!slot) {
             if (cur.institution || cur.degree) {
