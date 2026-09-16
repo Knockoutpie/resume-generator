@@ -164,6 +164,10 @@ check('BUG 6 — heading with trailing qualifier is found', () =>
   eq(isHeader(line('FLIGHT HOURS — AS OF JUNE 2026', { bold: true }), 10), 'hours'));
 check('BUG 6 — prose "Experience: 5 years..." is NOT a heading', () =>
   eq(isHeader(line('Experience: 5 years of flying in the desert southwest'), 10), null));
+check('BUG 8 — "Flight Experience" is an hours heading, not work experience', () =>
+  eq(isHeader(line('Flight Experience', { bold: true }), 10), 'hours'));
+check('BUG 8 — plain "Experience" still means work experience', () =>
+  eq(isHeader(line('Experience', { bold: true }), 10), 'experience'));
 check('a bullet is never a heading', () =>
   eq(isHeader(line('• Education and outreach for pilots', { bullet: true }), 10), null));
 check('a date line is never a heading', () =>
@@ -219,6 +223,11 @@ check('hours parse after dot leaders are stripped', () => {
   const h = parseHours([line('Total Hours 408'), line('Multi Engine 76')]);
   if (h.length !== 2) return 'got ' + h.length + ' rows';
   return eq(h[0].value, '408', 'value');
+});
+check('BUG 9 — hour labels containing a dash still parse', () => {
+  const h = parseHours([line('Instrument — Simulated 99.5'), line('Multi-Engine PIC 9.9')]);
+  if (h.length !== 2) return 'got ' + h.length + ' rows, expected 2';
+  return eq(h[0].value, '99.5', 'simulated instrument');
 });
 check('grouped skills parse into categories', () => {
   const s = parseSkills([line('Programming: Python, SQL, VBA')]);

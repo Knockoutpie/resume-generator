@@ -248,7 +248,9 @@ const SECTION_LEX = {
     projects: ['(?:professional\\s+|personal\\s+|key\\s+|selected\\s+)?projects?'],
     education: ['education(?:al)?(?:\\s+background)?', 'academics?', 'academic\\s+background'],
     certificates: ['(?:certificates?|certifications?|licen[cs]es?|ratings?|credentials)(?:\\s*(?:&|and)\\s*(?:ratings?|certificates?|licen[cs]es?))?'],
-    hours: ['(?:flight|flying|pilot)?\\s*(?:hours|time)', 'flight\\s+time', 'flight\\s+hours?'],
+    // "Flight Experience" needs the aviation qualifier, so it cannot swallow "Experience"
+    hours: ['(?:flight|flying|pilot)?\\s*(?:hours|time)', 'flight\\s+time', 'flight\\s+hours?',
+            '(?:flight|flying|pilot)\\s+(?:experience|time\\s+summary)', 'flight\\s+time\\s+summary'],
     training: ['(?:aviation\\s+|flight\\s+|professional\\s+)?training(?:\\s*(?:&|and)\\s*(?:education|development))?'],
     volunteer: ['(?:volunteer|community)(?:\\s+\\w+)?(?:\\s*(?:&|and)\\s*(?:community|volunteer)(?:\\s+\\w+)?)?'],
     references: ['references?']
@@ -425,7 +427,8 @@ function parseEdu(lines) {
     return ents;
 }
 
-const HOURS_RE = /^([A-Za-z][A-Za-z ()/&.'-]{1,38}?)[\s.:]*?([\d,]+(?:\.\d+)?)\s*$/;
+// label may contain dashes of any kind: "Instrument - Simulated", "Multi-Engine PIC"
+const HOURS_RE = /^([A-Za-z][A-Za-z ()/&.'‐-―-]{1,38}?)[\s.:]*?([\d,]+(?:\.\d+)?)\s*$/;
 
 function parseHours(lines) {
     const out = [];
